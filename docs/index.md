@@ -1,7 +1,7 @@
-# {package}
+# pvtpy
 
-+ **Documentation** [http://scuervo91.github.io/{package}](http://scuervo91.github.io/{package})
-+ **Sorce Code** [https://github.com/scuervo91/{package}](https://github.com/scuervo91/{package})
++ **Documentation** [http://scuervo91.github.io/pvtpy](http://scuervo91.github.io/pvtpy)
++ **Sorce Code** [https://github.com/scuervo91/pvtpy](https://github.com/scuervo91/pvtpy)
 
 {package description}
 
@@ -15,7 +15,7 @@
 
 
 ```console
-$ pip install {package}
+$ pip install pvtpy
 
 ---> 100%
 ```
@@ -23,4 +23,4 @@ $ pip install {package}
 
 ## License
 
-This project is licensed under the terms of the MIT license.
+This project is licensed under the terms of the MIT license

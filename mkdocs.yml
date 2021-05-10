@@ -1,4 +1,4 @@
-site_name: Package
+site_name: PVTpy
 theme:
   name: material
   palette:

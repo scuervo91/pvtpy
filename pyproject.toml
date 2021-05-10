@@ -1,5 +1,5 @@
 [tool.poetry]
-name = "package"
+name = "pvtpy"
 version = "0.1.0"
 description = "descriptions"
 authors = ["Santiago Cuervo"]
