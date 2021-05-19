@@ -1,6 +1,6 @@
 from pydantic import BaseModel, Field
 from typing import List, Optional
-
+from ..pvt import PVT, TemperatureUnits,PressureUnits
 
 class InitialConditions(BaseModel):
     pressure: float = Field(...,gt=0)
@@ -11,8 +11,9 @@ class InitialConditions(BaseModel):
 
 class Oil(BaseModel):
     api: float = Field(...,gt=0)
-    sulphur: Optional[float] = Field(None, gt=0)
-    bubble_pressure: Optional[float] = Field(None, gt=0)
-    rsb: Optional[float] = Field(None, gt=0)
+    sulphur: float = Field(None, gt=0)
+    bubble_pressure: float = Field(None, gt=0)
+    rsb: float = Field(None, gt=0)
     initial_conditions: InitialConditions = Field(...)
+    pvt: PVT = Field(None)
 

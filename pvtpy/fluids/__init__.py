@@ -1,1 +1,1 @@
-from .fluids import Oil, Water, Gas
+from .fluids import Oil, InitialConditions
