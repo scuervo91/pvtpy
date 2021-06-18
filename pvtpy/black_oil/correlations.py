@@ -2,7 +2,7 @@ import numpy as np
 import pandas as pd
 from numpy.polynomial.polynomial import polyval
 from scipy.interpolate import interp1d
-
+from enum import Enum
 
 #####################################################################################
 #####################################################################################
@@ -50,6 +50,12 @@ def h2s_correction(api=None, y=0, temp=None):
         ch2s = 1.0 - (0.9035 + 0.0015 * api) * y + 0.019 * (45 - api) * np.power(y, 2)
     return ch2s
 
+
+class pb_correlations(str,Enum):
+    standing = 'standing'
+    laster = 'laster'
+    vazquez_beggs = 'vazquez_beggs'
+    glaso = 'glaso'
 
 # Bubble point
 def pb(rs=None, temp=None, sg_gas=None, api=None, method='standing', correction=True, **kwargs):
@@ -163,6 +169,14 @@ def pb(rs=None, temp=None, sg_gas=None, api=None, method='standing', correction=
 
 #####################################################################################
 # gas-Oil Ratio Correlations
+
+class rs_correlations(str,Enum):
+    standing = 'standing'
+    laster = 'laster'
+    vazquez_beggs = 'vazquez_beggs'
+    glaso = 'glaso'
+    valarde = 'valarde'
+    
 
 def rs(p=None, pb=None, temp=None, api=None, sg_gas=None, rsb=None, method='standing', **kwargs):
     """
@@ -304,6 +318,11 @@ def rs(p=None, pb=None, temp=None, api=None, sg_gas=None, rsb=None, method='stan
 #####################################################################################
 # Oil Volumetric Factor
 
+class bo_correlations(str,Enum):
+    standing = 'standing'
+    vazquez_beggs = 'vazquez_beggs'
+    glaso = 'glaso'
+
 def bo(p=None, rs=None, pb=None, temp=None, api=None, sg_gas=None, method='standing', **kwargs):
     """
     Estimate the Oil Volumetric Factor using Correlations
@@ -395,7 +414,14 @@ def bo(p=None, rs=None, pb=None, temp=None, api=None, sg_gas=None, method='stand
 
 #####################################################################################
 # Oil Compressibility
+class co_above_correlations(str,Enum):
+    vazquez_beggs = 'vazquez_beggs'
+    petrosky = 'petrosky'
+    kartoatmodjo = 'kartoatmodjo'
 
+class co_below_correlations(str,Enum):
+    mccain = 'mccain'
+    
 def co(p=None, rs=None, pb=None, temp=None, sg_gas=None, api=None, bo=None,
        method_above_pb='vazquez_beggs', method_below_pb='mccain', **kwargs):
     """
@@ -473,6 +499,11 @@ def co(p=None, rs=None, pb=None, temp=None, sg_gas=None, api=None, bo=None,
     co_df.index.name = 'pressure'
     return co_df
 
+class muod_correlations(str,Enum):
+    beal = 'beal'
+    beggs = 'beggs'
+    glasso = 'glasso'
+
 
 #####################################################################################
 # Dead Oil Viscosity
@@ -533,6 +564,18 @@ def muod(temp=None, api=None, method='beal', **kwargs):
 
 #####################################################################################
 # Live Oil Viscosity
+
+class muo_below_correlations(str,Enum):
+    chew = 'chew'
+    beggs = 'beggs'
+    kartoatmodjo = 'kartoatmodjo'
+    
+class muo_above_correlations(str,Enum):
+    beal = 'beal'
+    vazquez_beggs = 'vazquez_beggs'
+    kartoatmodjo = 'kartoatmodjo'
+
+
 def muo(p=None, rs=None, pb=None, temp=None, api=None,
         method_below_pb='beggs', method_above_pb='vazquez_beggs', method_dead='beal', **kwargs):
     """
@@ -630,6 +673,10 @@ def muo(p=None, rs=None, pb=None, temp=None, api=None,
 #####################################################################################
 # Oil density
 
+class rho_correlations(str,Enum):
+    banzer = 'banzer'
+
+
 def rho_oil(p=None, co=None, bo=None, rs=None, api=None, pb=None, method='banzer', **kwargs):
     """
     Estimate the Oil Density in lb/ft3
@@ -709,6 +756,12 @@ def rho_oil(p=None, co=None, bo=None, rs=None, api=None, pb=None, method='banzer
 #####################################################################################
 ############################ WATER CORRELATIONS #####################################
 
+class rsw_correlations(str,Enum):
+    culberson = 'culberson'
+    mccoy = 'mccoy'
+
+
+
 def rsw(p=None, t=None, s=None, method='culberson'):
     """
     Estimate Water Gas solubility is 
@@ -772,6 +825,8 @@ def rsw(p=None, t=None, s=None, method='culberson'):
     rsw_df.index.name = 'pressure'
     return rsw_df
 
+class bw_correlations(str,Enum):
+    mccain = 'mccain'
 
 def bw(p=None, t=None, pb=0, cw=0, s=None, method='mccain'):
     """
@@ -865,6 +920,9 @@ def bw(p=None, t=None, pb=0, cw=0, s=None, method='mccain'):
     bw_df.index.name = 'pressure'
     return bw_df
 
+class cw_correlations(str,Enum):
+    standing = 'standing'
+    osif = 'osif'
 
 def cw(p=None, t=None, rsw=0, s=0, method='standing'):  # Note: Pending develop cw pressure < pb
     """
@@ -935,7 +993,12 @@ def cw(p=None, t=None, rsw=0, s=0, method='standing'):  # Note: Pending develop 
     cw_df.index.name = 'pressure'
     return cw_df
 
-
+class muw_correlations(str,Enum):
+    van_wingen = 'van_wingen'
+    russel = 'russel'
+    meehan = 'meehan'
+    brill_beggs = 'brill_beggs'
+    
 def muw(p=None, t=None, s = 0,  method = 'van_wingen'):
     """
     Estimate Water Viscosity
@@ -1001,6 +1064,10 @@ def muw(p=None, t=None, s = 0,  method = 'van_wingen'):
     muw_df.index.name = 'pressure'
     return muw_df
 
+class rhow_correlations(str,Enum):
+    banzer = 'banzer'
+    mccain = 'mccain'
+
 def rhow(p=None,s=0, bw=1, method = 'banzer'):
     """
     Estimate Water Density in lb/ft3
@@ -1056,6 +1123,9 @@ def rhow(p=None,s=0, bw=1, method = 'banzer'):
 #####################################################################################
 ############################ GAS CORRELATIONS #######################################
 
+class rhog_correlations(str,Enum):
+    ideal_gas = 'ideal_gas'
+    real_gas = 'real_gas'
 
 def rhog(p=None, ma=None, z=1, r=10.73, t=None, method='ideal_gas'):
     """
@@ -1114,6 +1184,9 @@ def rhog(p=None, ma=None, z=1, r=10.73, t=None, method='ideal_gas'):
     rhog_df = pd.DataFrame(rhog_dict, index=p) if multiple == True else pd.DataFrame({'rhog': rhog}, index=p)
     rhog_df.index.name = 'pressure'
     return rhog_df
+
+class z_correlations(str,Enum):
+    papay = 'papay'
 
 def z_factor(p=None, t=None, ppc=None, tpc=None, method='papay'):
     """
@@ -1266,6 +1339,7 @@ def eg(p=None, t=None, z=1, unit='scf/ft3'):
     eg_df.index.name = 'pressure'
     return eg_df 
 
+
 def critical_properties(sg=None, gas_type='natural_gas',method='standing'):
     """
     Estimate Gas Critial Properties from Specific Gravity of gas. Brown Correlation
@@ -1350,6 +1424,9 @@ def critical_properties_correction(ppc=None, tpc=None, h2s=0,co2=0, n2=0, method
     cp_c_dict = {'ppc':ppc_c,'tpc':tpc_c}
     return cp_c_dict
 
+class mug_correlations(str,Enum):
+    lee_gonzalez = 'lee_gonzalez'
+
 def mug(p=None, t=None, rhog=None, ma=None, method='lee_gonzalez'):
     """
     Estimate gas viscosity
@@ -1389,6 +1466,10 @@ def mug(p=None, t=None, rhog=None, ma=None, method='lee_gonzalez'):
     mug_df = pd.DataFrame({'mug': mug}, index=p)
     mug_df.index.name = 'pressure'
     return mug_df
+
+class cg_correlations(str,Enum):
+    ideal_gas = 'ideal_gas'
+    real_gas = 'real_gas'
 
 def cg(p=None, z=1, method='ideal_gas'):
     """
