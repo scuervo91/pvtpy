@@ -1242,7 +1242,11 @@ def z_factor(p=None, t=None, ppc=None, tpc=None, method='papay'):
     z_df.index.name = 'pressure'
     return z_df    
 
-def bg(p=None, t=None, z=1, unit='ft3/scf'):
+class bg_units(str,Enum):
+    ft3scf = 'ft3scf'
+    bblscf = 'bblscf'
+
+def bg(p=None, t=None, z=1, unit='ft3scf'):
     """
     Estimate Gas Volumetric factor 
 
@@ -1279,11 +1283,11 @@ def bg(p=None, t=None, z=1, unit='ft3/scf'):
 
     bg_dict = {}
 
-    if 'ft3/scf' in units:
+    if 'ft3scf' in units:
         bg = 0.02827*z*t/p
         bg_dict['bg_ft3/scf'] = bg 
     
-    if 'bbl/scf' in units: 
+    if 'bblscf' in units: 
         bg = 0.00503*z*t/p
         bg_dict['bg_bbl/scf'] = bg  
 
@@ -1291,7 +1295,11 @@ def bg(p=None, t=None, z=1, unit='ft3/scf'):
     bg_df.index.name = 'pressure'
     return bg_df 
 
-def eg(p=None, t=None, z=1, unit='scf/ft3'):
+class eg_units(str,Enum):
+    scfft3 = 'scfft3'
+    scfbbl = 'scfbbl'
+
+def eg(p=None, t=None, z=1, unit='scfft3'):
     """
     Estimate Gas Volumetric expansion factor
 
@@ -1328,11 +1336,11 @@ def eg(p=None, t=None, z=1, unit='scf/ft3'):
 
     eg_dict = {}
 
-    if 'scf/ft3' in units:
+    if 'scfft3' in units:
         eg = 35.37*p/(z*t)
         eg_dict['eg_scf/ft3'] = eg
     
-    if 'scf/bbl' in units: 
+    if 'scfbbl' in units: 
         eg = 198.6*p/(z*t)
         eg_dict['eg_scf bbl'] = eg  
 
@@ -1340,7 +1348,9 @@ def eg(p=None, t=None, z=1, unit='scf/ft3'):
     eg_df.index.name = 'pressure'
     return eg_df 
 
-
+class cp_correlations(str,Enum):
+    standing = 'standing'
+    
 def critical_properties(sg=None, gas_type='natural_gas',method='standing'):
     """
     Estimate Gas Critial Properties from Specific Gravity of gas. Brown Correlation
@@ -1387,7 +1397,11 @@ def critical_properties(sg=None, gas_type='natural_gas',method='standing'):
     
     return cp_dict 
 
-def critical_properties_correction(ppc=None, tpc=None, h2s=0,co2=0, n2=0, method='wichert-aziz'):
+class cp_correction_correlations(str,Enum):
+    wichert_aziz = 'wichert_aziz'
+    carr_kobayashi_burrows = 'carr_kobayashi_burrows'
+
+def critical_properties_correction(ppc=None, tpc=None, h2s=0,co2=0, n2=0, method='wichert_aziz'):
     """
     Correct the critical properties estimations by Non-hydrocarbon components
 
@@ -1397,7 +1411,7 @@ def critical_properties_correction(ppc=None, tpc=None, h2s=0,co2=0, n2=0, method
         h2s -> (int,float,list,np.array) H2S mole fraction
         co2 -> (int,float,list,np.array) co2 mole fraction
         n2 -> (int,float,list,np.array) n2 mole fraction
-        method -> (str, default 'wichert-aziz') correlation. Options: 'wichert-aziz', 'carr_kobayashi_burrows'
+        method -> (str, default 'wichert_aziz') correlation. Options: 'wichert_aziz', 'carr_kobayashi_burrows'
 
     Return:
         critical_properties -> (dict) Dictionary with keys 'ppc' and 'tpc'
@@ -1410,7 +1424,7 @@ def critical_properties_correction(ppc=None, tpc=None, h2s=0,co2=0, n2=0, method
     assert isinstance(tpc, (int, float, list, np.ndarray))
     tpc = np.atleast_1d(tpc)
 
-    if method =='wichert-aziz':
+    if method =='wichert_aziz':
         a = h2s + co2
         b = h2s
         e = 120*(np.power(a,0.9)-np.power(a,1.6)) + 15*(np.power(b,0.5) - np.power(b,4))
@@ -1523,4 +1537,19 @@ class SetOilCorrelations(BaseModel):
     mup_above: muo_above_correlations = muo_above_correlations.beal
     muo_below: muo_below_correlations = muo_below_correlations.beggs
     rho: rho_correlations = rho_correlations.banzer
-        
+    
+class SetGasCorrelations(BaseModel):
+    critical_properties: cp_correlations = cp_correlations.standing
+    critical_properties_correction: cp_correction_correlations = cp_correction_correlations.wichert_aziz
+    z: z_correlations = z_correlations.papay
+    rhog: rhog_correlations.real_gas
+    bg: bg_units = bg_units.bblscf
+    mug: mug_correlations = mug_correlations.lee_gonzalez
+    cg: cg_correlations = cg_correlations.real_gas
+    
+class SetWaterCorrelations(BaseModel):
+    rsw: rsw_correlations = rsw_correlations.culberson
+    cw: cw_correlations = cw_correlations.standing
+    bw: bw_correlations = bw_correlations.mccain
+    rhow: rhow_correlations = rhow_correlations.banzer
+    muw: muw_correlations = muw_correlations.van_wingen
