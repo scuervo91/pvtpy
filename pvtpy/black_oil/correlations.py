@@ -3,6 +3,7 @@ import pandas as pd
 from numpy.polynomial.polynomial import polyval
 from scipy.interpolate import interp1d
 from enum import Enum
+from pydantic import BaseModel
 
 #####################################################################################
 #####################################################################################
@@ -1511,7 +1512,15 @@ def cg(p=None, z=1, method='ideal_gas'):
     cg_df.index.name = 'pressure'
     return cg_df 
 
+
+class SetOilCorrelations(BaseModel):
+    pb: pb_correlations = pb_correlations.standing
+    rs: rs_correlations = rs_correlations.standing
+    bo: bo_correlations = bo_correlations.standing
+    co_above: co_above_correlations = co_above_correlations.vazquez_beggs
+    co_below: co_below_correlations = co_below_correlations.mccain
+    moud: muod_correlations = muod_correlations.beal
+    mup_above: muo_above_correlations = muo_above_correlations.beal
+    muo_below: muo_below_correlations = muo_below_correlations.beggs
+    rho: rho_correlations = rho_correlations.banzer
         
-
-
-
