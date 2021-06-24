@@ -1533,8 +1533,8 @@ class SetOilCorrelations(BaseModel):
     bo: bo_correlations = bo_correlations.standing
     co_above: co_above_correlations = co_above_correlations.vazquez_beggs
     co_below: co_below_correlations = co_below_correlations.mccain
-    moud: muod_correlations = muod_correlations.beal
-    mup_above: muo_above_correlations = muo_above_correlations.beal
+    muod: muod_correlations = muod_correlations.beal
+    muo_above: muo_above_correlations = muo_above_correlations.beal
     muo_below: muo_below_correlations = muo_below_correlations.beggs
     rho: rho_correlations = rho_correlations.banzer
     
