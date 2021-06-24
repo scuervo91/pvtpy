@@ -1,1 +1,1 @@
-from .fluids import Oil, InitialConditions
+from .fluids import Oil, InitialConditions, FluidBase
