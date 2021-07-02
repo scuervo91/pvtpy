@@ -133,5 +133,70 @@ class Oil(FluidBase):
         #print(_pvt.df())
         return _pvt
         
+    def to_ecl(
+        self,
+        pressure=None,
+        n_sat = 10,
+        n_unsat = 5,
+        min_pressure = None,
+        max_pressure = None,
+        properties = ['rs','bo','muo'],
+        float_format = '{:.3f}'.format,
+    ):
+        if any([self.pvt is None, self.pb is None, self.rsb is None]):
+            raise ValueError('PVT, pb and rsb must be defined')
+
+        string = ""
+        string += "-- OIL PVT TABLE FOR LIVE OIL\n"
+        string += 'PVTO\n'
+        string += "-- rs      pres  bo      visc\n"
+        string += "-- Mscf/rb psi   RB/STB  cP  \n"
+        string += "-- ------- ----  ----    ---- \n"
         
-        
+        if pressure  is None:
+            if min_pressure is None:
+                min_pressure = np.min(self.pvt.pressure)
+            if max_pressure is None:
+                max_pressure = np.max(self.pvt.pressure)
+            if min_pressure >= self.pb:
+                pressure = np.linspace(min_pressure,max_pressure,n_sat)
+                flag = 'unsat'
+            elif max_pressure <= self.pb:
+                pressure = np.linspace(min_pressure,max_pressure,n_sat)
+                flag = 'sat'
+            else:
+                sat_pressure = np.linspace(min_pressure,self.pb,n_sat)
+                unsat_pressure = np.linspace(self.pb,max_pressure, n_unsat+1)
+                pressure = np.concatenate((sat_pressure,unsat_pressure[1:]))
+                flag = 'mixed'
+                
+            pvt_df = self.pvt.interpolate(pressure, cols=properties).reset_index()
+
+            #convert rs units from scf/bbl to Mscf/bbl
+            pvt_df['rs'] = pvt_df['rs'] * 1e-3
+            
+            if flag == 'unsat':
+                string += pvt_df[['rs','pressure','bo','muo']].to_string(header=False, index=False,float_format=float_format) +'\n /\n'
+            elif flag == 'sat':
+                
+                for i,r in pvt_df.iterrows():
+                    string += pvt_df.loc[[i],['rs','pressure','bo','muo']].to_string(index=False, header=False,float_format=float_format) + '/\n'
+                    
+                string += '/\n'
+                
+            else:
+                
+                #Print Saturated data
+                for i,r in pvt_df[pvt_df['pressure']<self.pb].iterrows():
+                    string += pvt_df.loc[[i],['rs','pressure','bo','muo']].to_string(index=False, header=False,float_format=float_format) + '/\n'  
+                        
+                #Print data at bubble point
+                string += pvt_df.loc[pvt_df['pressure']==self.pb,['rs','pressure','bo','muo']].to_string(index=False, header=False,float_format=float_format) + '\n'  
+                
+                string += '-- Unsaturated Data\n'
+                string += pvt_df.loc[pvt_df['pressure']>self.pb,['pressure','bo','muo']].to_string(index=False, header=False,float_format=float_format)
+                string += '/\n/'
+            
+            return string
+                    
+                
