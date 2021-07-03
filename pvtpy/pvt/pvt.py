@@ -123,7 +123,7 @@ class Chromatography(BaseModel):
     def get_pseudo_critical_properties(
         self,
         correct=True, 
-        correct_method = 'wichert-azis',
+        correct_method = 'wichert_aziz',
         normalize=True
     ):
         df = self.df(normalize=normalize)
@@ -140,21 +140,21 @@ class Chromatography(BaseModel):
             
         return CriticalProperties(**cp_correction)
     
-    def get_z(self,pressure=14.7,temperature=60, z_method='papay', cp_correction_method='wichert-aziz', normalize=True):
+    def get_z(self,pressure=14.7,temperature=60, z_method='papay', cp_correction_method='wichert_aziz', normalize=True):
         cp = self.get_pseudo_critical_properties(correct=True, correct_method=cp_correction_method,normalize=normalize)
         return z_factor(p=pressure,t=temperature, ppc = cp.ppc, tpc = cp.tpc, method=z_method)
 
-    def get_rhog(self,p=14.7,t=60, z_method='papay',rhog_method='real_gas',normalize=True):
+    def get_rhog(self,pressure=14.7,temperature=60, z_method='papay',rhog_method='real_gas',normalize=True):
         _ma = self.mwa(normalize=normalize)
         if rhog_method == 'ideal_gas':
-            _rhog = rhog(p=p,ma=_ma,t=t)
+            _rhog = rhog(p=pressure,ma=_ma,t=temperature)
         elif rhog_method == 'real_gas':
-            _z = self.get_z(p=p,t=t,z_method = z_method, normalize=normalize)
-            _rhog = rhog(p=p,ma=_ma,z=_z.values.reshape(-1), t=t, method=rhog_method)
+            _z = self.get_z(pressure=pressure,temperature=temperature,z_method = z_method, normalize=normalize)
+            _rhog = rhog(p=pressure,ma=_ma,z=_z.values.reshape(-1), t=temperature, method=rhog_method)
         return _rhog
     
-    def get_sv(self,p=14.7,t=60, z_method='papay',rhog_method='real_gas',normalize=True):
-        rhog = self.get_rhog(p=p,t=t, z_method=z_method,rhog_method=rhog_method,normalize=normalize)
+    def get_sv(self,pressure=14.7,temperature=60, z_method='papay',rhog_method='real_gas',normalize=True):
+        rhog = self.get_rhog(pressure=pressure,temperature=temperature, z_method=z_method,rhog_method=rhog_method,normalize=normalize)
         rhog['sv'] = 1 / rhog['rhog']
         return rhog['sv']
     
