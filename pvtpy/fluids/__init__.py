@@ -1,1 +1,3 @@
-from .fluids import Oil, InitialConditions, FluidBase
+from .oil import Oil
+from .base import FluidBase, InitialConditions
+from .gas import Gas, GasType
