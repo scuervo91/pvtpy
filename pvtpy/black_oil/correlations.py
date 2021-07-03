@@ -1432,9 +1432,12 @@ def critical_properties_correction(ppc=None, tpc=None, h2s=0,co2=0, n2=0, method
         tpc_c = tpc - e
         ppc_c = (ppc*tpc_c)/(tpc + b*(1-b)*e)
 
-    if method == 'carr_kobayashi_burrows':
+    elif method == 'carr_kobayashi_burrows':
         tpc_c = tpc - 80*co2 + 130*h2s - 250*n2
         ppc_c = ppc + 440*co2 + 600*h2s - 170*n2
+    
+    else:
+        raise ValueError('No method matched')
 
     return {'ppc':ppc_c,'tpc':tpc_c}
 
@@ -1542,10 +1545,10 @@ class SetGasCorrelations(BaseModel):
     critical_properties_correction: cp_correction_correlations = cp_correction_correlations.wichert_aziz
     correct_critical_properties: bool = Field(True)
     z: z_correlations = z_correlations.papay
-    rhog: rhog_correlations.real_gas
+    rhog: rhog_correlations = rhog_correlations.real_gas
     bg: bg_units = bg_units.bblscf
     mug: mug_correlations = mug_correlations.lee_gonzalez
-    cg: cg_correlations = cg_correlations.real_gas
+    cg: cg_correlations = cg_correlations.ideal_gas
     
 class SetWaterCorrelations(BaseModel):
     rsw: rsw_correlations = rsw_correlations.culberson
