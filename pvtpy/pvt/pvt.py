@@ -1,3 +1,4 @@
+from pvtpy.black_oil.correlations import critical_properties, critical_properties_correction, z_factor, rhog
 from pydantic import BaseModel, Field, validator
 from typing import List, Optional, Dict
 from enum import Enum
@@ -64,6 +65,10 @@ class JoinItem(str, Enum):
     id = 'id'
     name = 'name'
     
+class CriticalProperties(BaseModel):
+    ppc: float
+    tpc: float
+    
 class Chromatography(BaseModel):
     join: JoinItem = Field(JoinItem.name)
     components: List[str] = Field(...)
@@ -114,4 +119,44 @@ class Chromatography(BaseModel):
     def gas_sg(self, normalize=True):
         mwa = self.mwa(normalize=normalize)
         return mwa / 28.96
+    
+    def get_pseudo_critical_properties(
+        self,
+        correct=True, 
+        correct_method = 'wichert-azis',
+        normalize=True
+    ):
+        df = self.df(normalize=normalize)
+        _ppc = np.dot(df['mole_fraction'].values, df['ppc'].values)
+        _tpc = np.dot(df['mole_fraction'].values, df['tpc'].values)
+        
+        if correct:
+            _co2 = df.loc[df['name']=='carbon-dioxide', 'mole_fraction'].values[0] if 'carbon-dioxide' in df['name'].tolist() else 0
+            _n2 = df.loc[df['name']=='nitrogen', 'mole_fraction'].values[0] if 'nitrogen' in df['name'].tolist() else 0
+            _h2s = df.loc[df['name']=='hydrogen-sulfide', 'mole_fraction'].values[0] if 'hydrogen-sulfide' in df['name'].tolist() else 0
+            cp_correction = critical_properties_correction(ppc=_ppc, tpc=_tpc, co2=_co2, n2=_n2, h2s=_h2s, method=correct_method)
+        else:
+            cp_correction = {'ppc':_ppc,'tpc':_tpc}
+            
+        return CriticalProperties(**cp_correction)
+    
+    def get_z(self,pressure=14.7,temperature=60, z_method='papay', cp_correction_method='wichert-aziz', normalize=True):
+        cp = self.get_pseudo_critical_properties(correct=True, correct_method=cp_correction_method,normalize=normalize)
+        return z_factor(p=pressure,t=temperature, ppc = cp.ppc, tpc = cp.tpc, method=z_method)
+
+    def get_rhog(self,p=14.7,t=60, z_method='papay',rhog_method='real_gas',normalize=True):
+        _ma = self.mwa(normalize=normalize)
+        if rhog_method == 'ideal_gas':
+            _rhog = rhog(p=p,ma=_ma,t=t)
+        elif rhog_method == 'real_gas':
+            _z = self.get_z(p=p,t=t,z_method = z_method, normalize=normalize)
+            _rhog = rhog(p=p,ma=_ma,z=_z.values.reshape(-1), t=t, method=rhog_method)
+        return _rhog
+    
+    def get_sv(self,p=14.7,t=60, z_method='papay',rhog_method='real_gas',normalize=True):
+        rhog = self.get_rhog(p=p,t=t, z_method=z_method,rhog_method=rhog_method,normalize=normalize)
+        rhog['sv'] = 1 / rhog['rhog']
+        return rhog['sv']
+    
+    
         
