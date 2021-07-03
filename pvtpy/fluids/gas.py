@@ -1,4 +1,4 @@
-from pvtpy.pvt.pvt import CriticalProperties
+from ..compositional import CriticalProperties
 from pydantic import Field 
 import numpy as np
 from enum import Enum

@@ -1,2 +1,1 @@
-from .pvt import PVT, PressureUnits, TemperatureUnits, Chromatography, JoinItem
-from .components import properties_df
+from .pvt import PVT, PressureUnits, TemperatureUnits

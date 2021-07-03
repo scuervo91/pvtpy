@@ -1,6 +1,7 @@
 
 from pydantic import BaseModel, Field
-from ..pvt import PVT, TemperatureUnits,PressureUnits, Chromatography
+from ..pvt import PVT, TemperatureUnits,PressureUnits
+from ..compositional import Chromatography
 
 class InitialConditions(BaseModel):
     pressure: float = Field(...,gt=0)
