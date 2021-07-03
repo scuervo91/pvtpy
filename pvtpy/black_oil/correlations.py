@@ -3,7 +3,7 @@ import pandas as pd
 from numpy.polynomial.polynomial import polyval
 from scipy.interpolate import interp1d
 from enum import Enum
-from pydantic import BaseModel
+from pydantic import BaseModel, Field
 
 #####################################################################################
 #####################################################################################
@@ -1436,8 +1436,7 @@ def critical_properties_correction(ppc=None, tpc=None, h2s=0,co2=0, n2=0, method
         tpc_c = tpc - 80*co2 + 130*h2s - 250*n2
         ppc_c = ppc + 440*co2 + 600*h2s - 170*n2
 
-    cp_c_dict = {'ppc':ppc_c,'tpc':tpc_c}
-    return cp_c_dict
+    return {'ppc':ppc_c,'tpc':tpc_c}
 
 class mug_correlations(str,Enum):
     lee_gonzalez = 'lee_gonzalez'
@@ -1541,6 +1540,7 @@ class SetOilCorrelations(BaseModel):
 class SetGasCorrelations(BaseModel):
     critical_properties: cp_correlations = cp_correlations.standing
     critical_properties_correction: cp_correction_correlations = cp_correction_correlations.wichert_aziz
+    correct_critical_properties: bool = Field(True)
     z: z_correlations = z_correlations.papay
     rhog: rhog_correlations.real_gas
     bg: bg_units = bg_units.bblscf
