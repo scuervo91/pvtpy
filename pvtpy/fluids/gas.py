@@ -1,3 +1,4 @@
+from pvtpy.pvt.pvt import CriticalProperties
 from pydantic import Field 
 import numpy as np
 from enum import Enum
@@ -16,6 +17,27 @@ class Gas(FluidBase):
     sg: float = Field(None, gt=0)
     gas_type: GasType = Field(GasType.natural_gas)
 
+    
+    def pseudo_critical_properties(self, correct=True, method='standing',correct_method='wichert_aziz', normalize=True):
+        # Define Pseudo critical properties
+        if self.chromatography is not None:
+            _cp = self.chromatography.get_pseudo_critical_properties(
+                correct = correct,
+                correct_method = correct_method,
+                normalize = normalize
+            )
+        elif self.sg is not None:
+            _cp_dict = cor.critical_properties(
+                sg = self.sg, 
+                gas_type = self.gas_type.value, 
+                method = method
+            )
+            _cp = CriticalProperties(ppc = _cp_dict['ppc'].item(),tpc = _cp_dict['tpc'].item())
+        else:
+            raise ValueError('Neither chromatography nor sg gas been set')
+        
+        return _cp
+        
     def pvt_from_correlations(
         self,
         start_pressure=20,
@@ -70,7 +92,7 @@ class Gas(FluidBase):
             p=p_range,
             t=self.initial_conditions.temperature, 
             z=z_cor['z'].values, 
-            method=correlations.bg
+            unit=correlations.bg
         )
         #Gas viscosity
         mug_cor = cor.mug(
@@ -94,7 +116,7 @@ class Gas(FluidBase):
             pressure= p_range.tolist(),
             fields={
                 'z':z_cor['z'].values.tolist(),
-                'rhog':rhog_cor['bo'].values.tolist(),
+                'rhog':rhog_cor['rhog'].values.tolist(),
                 'bg':bg_cor['bg'].values.tolist(),
                 'mug':mug_cor['mug'].values.tolist(),
                 'cg':cg_cor['cg'].values.tolist()
