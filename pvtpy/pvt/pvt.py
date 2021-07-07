@@ -11,10 +11,12 @@ from scipy.interpolate import interp1d
 class TemperatureUnits(str, Enum):
     farenheit = 'farenheit'
     celcius = 'celcius'
+    kelvin = 'kelvin'
     
 class PressureUnits(str, Enum):
     psi = 'psi'
     kpa = 'kpa'
+    bar = 'bar'
     
 class PVT(BaseModel):
     pressure: List[float] = Field(...)
