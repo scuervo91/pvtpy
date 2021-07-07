@@ -3,10 +3,12 @@ from pydantic import Field
 import numpy as np
 from enum import Enum
 import pandas as pd
-from ..pvt import PVT
+
 #Local imports
 from .base import FluidBase
-from  ..black_oil import correlations as cor
+from ..black_oil import correlations as cor
+from ..pvt import PVT
+from ..units import Pressure
 
 class GasType(str,Enum):
     natural_gas = 'natural_gas'
@@ -68,7 +70,7 @@ class Gas(FluidBase):
         # Compressibility factor z
         z_cor = cor.z_factor(
             p=p_range, 
-            t=self.initial_conditions.temperature, 
+            t=self.initial_conditions.temperature.value, 
             ppc=_cp.ppc, 
             tpc=_cp.tpc, 
             method=correlations.z)
@@ -84,20 +86,20 @@ class Gas(FluidBase):
             ma=_ma, 
             z=z_cor['z'].values, 
             r=10.73, 
-            t=self.initial_conditions.temperature, 
+            t=self.initial_conditions.temperature.value, 
             method=correlations.rhog
         )
         #Gas volumetric factor
         bg_cor = cor.bg(
             p=p_range,
-            t=self.initial_conditions.temperature, 
+            t=self.initial_conditions.temperature.value, 
             z=z_cor['z'].values, 
             unit=correlations.bg
         )
         #Gas viscosity
         mug_cor = cor.mug(
             p=p_range,
-            t=self.initial_conditions.temperature, 
+            t=self.initial_conditions.temperature.value, 
             rhog=rhog_cor['rhog'].values, 
             ma=_ma, 
             method=correlations.mug
@@ -113,7 +115,7 @@ class Gas(FluidBase):
         _pvt = pd.concat([z_cor,rhog_cor,bg_cor,mug_cor,cg_cor],axis=1)
         
         _pvt = PVT(
-            pressure= p_range.tolist(),
+            pressure= Pressure(value = p_range.tolist()),
             fields={
                 'z':z_cor['z'].values.tolist(),
                 'rhog':rhog_cor['rhog'].values.tolist(),

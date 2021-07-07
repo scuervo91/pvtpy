@@ -3,7 +3,8 @@ import numpy as np
 import pandas as pd
 from ..pvt import PVT
 from .base import FluidBase
-from  ..black_oil import correlations as cor 
+from ..black_oil import correlations as cor 
+from ..units import Pressure
 #(
 #    n2_correction, co2_correction, h2s_correction, pb, rs,
 #    bo, rho_oil, co, muod, muo,rsw, bw, cw, muw, rhow, rhog, z_factor, bg, eg, critical_properties,
@@ -36,7 +37,7 @@ class Oil(FluidBase):
         elif self.pb is None:
             pb = cor.pb(
                 rs=self.rsb,
-                temp=self.initial_conditions.temperature,
+                temp=self.initial_conditions.temperature.value,
                 sg_gas=self.sg_gas,
                 api=self.api,
                 methods=correlations.pb.value, correction=True)['pb'].values
@@ -45,7 +46,7 @@ class Oil(FluidBase):
             rs_cor = cor.rs(
                 p = p_range,
                 pb = pb,
-                temp = self.initial_conditions.temperature,
+                temp = self.initial_conditions.temperature.value,
                 sg_gas=self.sg_gas,
                 api=self.api,
                 methods = 'valarde'
@@ -54,7 +55,7 @@ class Oil(FluidBase):
             rs_cor = cor.rs(
                 p = p_range,
                 pb = self.pb,
-                temp = self.initial_conditions.temperature,
+                temp = self.initial_conditions.temperature.value,
                 sg_gas=self.sg_gas,
                 api=self.api,
                 methods = correlations.rs.value
@@ -64,7 +65,7 @@ class Oil(FluidBase):
             p = p_range,
             rs = rs_cor['rs'].values,
             pb = self.pb,
-            temp = self.initial_conditions.temperature,
+            temp = self.initial_conditions.temperature.value,
             sg_gas=self.sg_gas,
             api=self.api,
             methods = correlations.bo.value
@@ -74,7 +75,7 @@ class Oil(FluidBase):
             p = p_range,
             rs = rs_cor['rs'].values,
             pb = self.pb,
-            temp = self.initial_conditions.temperature,
+            temp = self.initial_conditions.temperature.value,
             sg_gas=self.sg_gas,
             api=self.api,
             bo=bo_cor['bo'].values,
@@ -86,7 +87,7 @@ class Oil(FluidBase):
             p = p_range,
             rs = rs_cor['rs'].values,
             pb = self.pb,
-            temp = self.initial_conditions.temperature,
+            temp = self.initial_conditions.temperature.value,
             api=self.api,
             method_above_pb = correlations.muo_above.value,
             method_below_pb = correlations.muo_below.value,
@@ -105,7 +106,7 @@ class Oil(FluidBase):
         
         #_pvt = pd.concat([rs_cor,bo_cor,co_cor,muo_cor,rho_cor],axis=1)
         _pvt = PVT(
-            pressure= p_range.tolist(),
+            pressure= Pressure(value=p_range.tolist()),
             fields={
                 'rs':rs_cor['rs'].values.tolist(),
                 'bo':bo_cor['bo'].values.tolist(),
@@ -140,9 +141,9 @@ class Oil(FluidBase):
         
         if pressure  is None:
             if min_pressure is None:
-                min_pressure = np.min(self.pvt.pressure)
+                min_pressure = np.min(self.pvt.pressure.value)
             if max_pressure is None:
-                max_pressure = np.max(self.pvt.pressure)
+                max_pressure = np.max(self.pvt.pressure.value)
             if min_pressure >= self.pb:
                 pressure = np.linspace(min_pressure,max_pressure,n_sat)
                 flag = 'unsat'

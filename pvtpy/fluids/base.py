@@ -1,15 +1,12 @@
 
 from pydantic import BaseModel, Field
-from ..pvt import PVT, TemperatureUnits,PressureUnits
+from ..pvt import PVT
+from ..units import TemperatureUnits,PressureUnits, Pressure, Temperature
 from ..compositional import Chromatography
 
 class InitialConditions(BaseModel):
-    pressure: float = Field(...,gt=0)
-    temperature: float = Field(...,gt=0)
-    pressure_unit: PressureUnits = PressureUnits.psi
-    temperature_unit: PressureUnits = TemperatureUnits.farenheit
-
-
+    pressure: Pressure = Field(...)
+    temperature: Temperature = Field(...)
 
 class FluidBase(BaseModel):
     initial_conditions: InitialConditions = Field(...)

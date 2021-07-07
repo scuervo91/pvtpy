@@ -21,4 +21,4 @@ class Pressure(BaseModel):
     
 class Temperature(BaseModel):
     value: Union[float, List[float]]
-    unit: PressureUnits = Field(TemperatureUnits.psi)
+    unit: PressureUnits = Field(TemperatureUnits.farenheit)

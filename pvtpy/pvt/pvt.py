@@ -7,25 +7,16 @@ import numpy as np
 from scipy.interpolate import interp1d
 
 #local imports
-
-class TemperatureUnits(str, Enum):
-    farenheit = 'farenheit'
-    celcius = 'celcius'
-    kelvin = 'kelvin'
-    
-class PressureUnits(str, Enum):
-    psi = 'psi'
-    kpa = 'kpa'
-    bar = 'bar'
+from ..units import TemperatureUnits, Temperature,PressureUnits,Pressure
     
 class PVT(BaseModel):
-    pressure: List[float] = Field(...)
+    pressure: Pressure = Field(...)
     fields: Dict[str,List[float]] = Field(...)
-    pressure_unit: PressureUnits = Field(PressureUnits.psi)
       
-    @validator('pressure')
-    def check_array_pressures_order(cls, v,values):
-        diff = np.diff(np.array(v))
+    @validator('pressure', pre=True)
+    def check_array_pressures_order(cls, v):
+        assert isinstance(v.value,list)
+        diff = np.diff(np.array(v.value))
         if not any([np.all(diff>0),np.all(diff<0)]):
             raise ValueError('Pressure must be ordered')
         return v
@@ -33,7 +24,7 @@ class PVT(BaseModel):
     @validator('fields')
     def check_length_fields(cls,v,values):
         for field in v:
-            assert len(v[field]) == len(values['pressure']), f'{field} has not the same length than pressure'
+            assert len(v[field]) == len(values['pressure'].value), f'{field} has not the same length than pressure'
         return v
     
     class Config:
@@ -42,7 +33,7 @@ class PVT(BaseModel):
         
     def df(self):
         d = self.dict()
-        _df = pd.DataFrame(d['fields'], index=d['pressure'])
+        _df = pd.DataFrame(d['fields'], index=d['pressure']['value'])
         _df.index.name = 'pressure'
         
         return _df
@@ -55,7 +46,7 @@ class PVT(BaseModel):
         int_cols = list(self.fields.keys()) if cols is None else cols
         
         for i in int_cols:
-            int_dict[i] = interp1d(self.pressure,self.fields[i],bounds_error=False,fill_value='extrapolate')(p)
+            int_dict[i] = interp1d(self.pressure.value,self.fields[i],bounds_error=False,fill_value='extrapolate')(p)
 
         int_df = pd.DataFrame(int_dict, index=p)
         int_df.index.name = 'pressure'
