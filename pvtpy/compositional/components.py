@@ -40,7 +40,7 @@ class Component(BaseModel):
     critical_pressure: Pressure = Field(None, description='Component critical pressure')
     critical_temperature: Temperature = Field(None, description='Component critical temperature')
     antoine_coefficients: Antoine = Field(None, description='Component Antoine coefficients')
-    
+    mole_fraction: float = Field(None, ge=0, le=1)
     def __init__(self,**kwargs):
         super().__init__(
             name = kwargs.get('name'),
@@ -50,7 +50,6 @@ class Component(BaseModel):
             molecular_weight = kwargs.get('molecular_weight',None),
             critical_temperature = Temperature(value=kwargs.get('critical_temperature'),unit = kwargs.get('critical_temperature_unit')) if 'critical_temperature' in kwargs else None,
             critical_pressure = Pressure(value=kwargs.get('critical_pressure'),unit = kwargs.get('critical_pressure_unit')) if 'critical_pressure' in kwargs else None,
-            antoine_coefficients = Antoine(a = kwargs.get('antoine_a'),b = kwargs.get('antoine_b'),c = kwargs.get('antoine_c')) if 'antoine_a' in kwargs else None
+            antoine_coefficients = Antoine(a = kwargs.get('antoine_a'),b = kwargs.get('antoine_b'),c = kwargs.get('antoine_c')) if 'antoine_a' in kwargs else None,
+            mole_fraction = kwargs.get('mole_fraction',None)
         )
-
-    

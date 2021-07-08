@@ -1,10 +1,10 @@
 from logging import critical
-from pydantic import BaseModel, Field, validator
+from pydantic import BaseModel, Field, validator, parse_obj_as
 from typing import List
 from enum import Enum
 import numpy as np
 import pandas as pd
-from .components import properties_df
+from .components import properties_df, Component
 from ..black_oil import correlations as cor
 
 
@@ -58,7 +58,11 @@ class Chromatography(BaseModel):
         
         _merged = _df.merge(properties_df, how='inner',left_index=True,right_on=self.join)
         
-        return _merged[['id','name','formula','mole_fraction','molecular_weight','critical_pressure','critical_temperature']]
+        return _merged
+    
+    def get_components(self, normalize=True):
+        _df = self.df(normalize=normalize)
+        return parse_obj_as(List[Component], _df.to_dict(orient='records'))
     
     def mwa(self, normalize=True):
         df = self.df(normalize=normalize)
