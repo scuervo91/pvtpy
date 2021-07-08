@@ -1,3 +1,4 @@
+from logging import critical
 from pydantic import BaseModel, Field, validator
 from typing import List
 from enum import Enum
@@ -12,8 +13,8 @@ class JoinItem(str, Enum):
     name = 'name'
 
 class CriticalProperties(BaseModel):
-    ppc: float
-    tpc: float
+    critical_pressure: float
+    critical_temperature: float
 
 
 class Chromatography(BaseModel):
@@ -57,11 +58,11 @@ class Chromatography(BaseModel):
         
         _merged = _df.merge(properties_df, how='inner',left_index=True,right_on=self.join)
         
-        return _merged[['id','name','formula','mole_fraction','mw','ppc','tpc']]
+        return _merged[['id','name','formula','mole_fraction','molecular_weight','critical_pressure','critical_temperature']]
     
     def mwa(self, normalize=True):
         df = self.df(normalize=normalize)
-        return np.dot(df['mole_fraction'].values, df['mw'].values)
+        return np.dot(df['mole_fraction'].values, df['molecular_weight'].values)
     
     def gas_sg(self, normalize=True):
         mwa = self.mwa(normalize=normalize)
@@ -74,8 +75,8 @@ class Chromatography(BaseModel):
         normalize=True
     ):
         df = self.df(normalize=normalize)
-        _ppc = np.dot(df['mole_fraction'].values, df['ppc'].values)
-        _tpc = np.dot(df['mole_fraction'].values, df['tpc'].values)
+        _ppc = np.dot(df['mole_fraction'].values, df['critical_pressure'].values)
+        _tpc = np.dot(df['mole_fraction'].values, df['critical_temperature'].values)
         
         if correct:
             _co2 = df.loc[df['name']=='carbon-dioxide', 'mole_fraction'].values[0] if 'carbon-dioxide' in df['name'].tolist() else 0
@@ -83,7 +84,7 @@ class Chromatography(BaseModel):
             _h2s = df.loc[df['name']=='hydrogen-sulfide', 'mole_fraction'].values[0] if 'hydrogen-sulfide' in df['name'].tolist() else 0
             cp_correction = cor.critical_properties_correction(ppc=_ppc, tpc=_tpc, co2=_co2, n2=_n2, h2s=_h2s, method=correct_method)
         else:
-            cp_correction = {'ppc':_ppc,'tpc':_tpc}
+            cp_correction = {'critical_pressure':_ppc,'critical_temperature':_tpc}
             
         return CriticalProperties(**cp_correction)
     
