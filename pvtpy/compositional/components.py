@@ -2,6 +2,7 @@ from logging import critical
 import numpy as np
 import pandas as pd
 from pydantic import BaseModel, constr, Field
+from typing import List, Dict, Union
 import os 
 
 #local imports
@@ -35,21 +36,35 @@ class Component(BaseModel):
     name: str = Field(..., description='Component name')
     formula: str = Field(None, description='Component formula')
     iupac_key: constr(regex = r'^([0-9A-Z\-]+)$') = Field(None, description='Component IUPAC key')
+    iupac: str = Field(None, description='Component IUPAC name')
     cas: constr(regex = r'\b[1-9]{1}[0-9]{1,6}-\d{2}-\d\b') = Field(None, description='Component CAS')
     molecular_weight: float = Field(...,gt=0,description='Component molecular weight')
     critical_pressure: Pressure = Field(None, description='Component critical pressure')
     critical_temperature: Temperature = Field(None, description='Component critical temperature')
     antoine_coefficients: Antoine = Field(None, description='Component Antoine coefficients')
     mole_fraction: float = Field(None, ge=0, le=1)
+    params: Dict[str, Union[int,float]] = Field(None, description='Component parameters')
     def __init__(self,**kwargs):
         super().__init__(
-            name = kwargs.get('name'),
-            formula = kwargs.get('formula',None),
-            iupac_key = kwargs.get('iupac_key',None),
-            cas = kwargs.get('cas',None),
-            molecular_weight = kwargs.get('molecular_weight',None),
-            critical_temperature = Temperature(value=kwargs.get('critical_temperature'),unit = kwargs.get('critical_temperature_unit')) if 'critical_temperature' in kwargs else None,
-            critical_pressure = Pressure(value=kwargs.get('critical_pressure'),unit = kwargs.get('critical_pressure_unit')) if 'critical_pressure' in kwargs else None,
-            antoine_coefficients = Antoine(a = kwargs.get('antoine_a'),b = kwargs.get('antoine_b'),c = kwargs.get('antoine_c')) if 'antoine_a' in kwargs else None,
-            mole_fraction = kwargs.get('mole_fraction',None)
+            name = kwargs.pop('name'),
+            formula = kwargs.pop('formula',None),
+            iupac_key = kwargs.pop('iupac_key',None),
+            iupac = kwargs.pop('iupac',None),
+            cas = kwargs.pop('cas',None),
+            molecular_weight = kwargs.pop('molecular_weight',None),
+            critical_temperature = Temperature(value=kwargs.pop('critical_temperature'),unit = kwargs.pop('critical_temperature_unit')) if 'critical_temperature' in kwargs else None,
+            critical_pressure = Pressure(value=kwargs.pop('critical_pressure'),unit = kwargs.pop('critical_pressure_unit')) if 'critical_pressure' in kwargs else None,
+            antoine_coefficients = Antoine(a = kwargs.pop('antoine_a'),b = kwargs.pop('antoine_b'),c = kwargs.pop('antoine_c')) if 'antoine_a' in kwargs else None,
+            mole_fraction = kwargs.pop('mole_fraction',None),
+            params = kwargs if bool(kwargs) else None
         )
+        
+    def df(self):
+        d = self.dict(
+            exclude={'critical_pressure', 'critical_temperature', 'antoine_coefficients','params','name'},
+            exclude_none=True
+        )
+        if self.params is not None:
+            d = d.update(self.params)
+
+        return pd.DataFrame(d, index=[self.name])

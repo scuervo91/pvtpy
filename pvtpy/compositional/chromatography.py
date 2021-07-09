@@ -18,58 +18,48 @@ class CriticalProperties(BaseModel):
 
 
 class Chromatography(BaseModel):
-    join: JoinItem = Field(JoinItem.name)
-    components: List[str] = Field(...)
-    mole_fraction: List[float] = Field(...)
-    
-    @validator('components', pre=True)
-    def check_components_merge(cls, v, values):
-        if values['join'] == JoinItem.id:
-            for id in v:
-                assert id>0 and id<= properties_df.shape[0]+1
-            return v
-        if values['join'] == JoinItem.name:
-            for name in v:
-                assert name in properties_df['name'].tolist()
-            return v
-        
-    @validator('mole_fraction', each_item=True)
-    def check_values_mole_fraction(cls,v):
-        assert v >= 0 and v <= 1, f'{v} is either less than 0 or greater than 1'
-        return v
-
-    @validator('mole_fraction')
-    def check_length_fields(cls,v,values):
-        assert len(v) == len(values['components'])
-        return v
-        
+    components: List[Component] = Field(None)
 
     class Config:
-        extra = 'forbid'
         validate_assignment = True
+        extra = 'forbid'
         
-    def df(self, normalize=True):
-        if normalize:
-            mf = np.array(self.mole_fraction)
-            mfn = mf / mf.sum()
-            _df = pd.DataFrame({'mole_fraction':mfn}, index=self.components)
+    def from_df(self, df: pd.DataFrame, name:str = None, mole_fraction:str = None):
+        if name is None:
+            if 'name' not in df.columns:
+                raise ValueError('Column name not defined')
+            name = 'name'
+        df = df.set_index(name)
+        
+        if mole_fraction is None:
+            if 'mole_fraction' not in df.columns:
+                raise ValueError('Column mole_fraction not defined')
         else:
-            _df = pd.DataFrame({'mole_fraction':self.mole_fraction}, index=self.components)
+            df = df.rename(columns={mole_fraction: 'mole_fraction'})
+               
+        _merged = df.merge(properties_df, how='inner',left_index=True,right_on='name')
+
+        self.components = parse_obj_as(List[Component], _merged.to_dict(orient='records'))
+
+    def df(self, normalize=True):
+        df = pd.DataFrame()
         
-        _merged = _df.merge(properties_df, how='inner',left_index=True,right_on=self.join)
-        
-        return _merged
+        for i in self.components:
+            df = df.append(i.df())
+            
+        if normalize:
+            mf = np.array(df['mole_fraction'])
+            mfn = mf / mf.sum()
+            df['mole_fraction'] = mfn
+            
+        return df
     
-    def get_components(self, normalize=True):
-        _df = self.df(normalize=normalize)
-        return parse_obj_as(List[Component], _df.to_dict(orient='records'))
-    
-    def mwa(self, normalize=True):
+    def apparent_molecular_weight(self, normalize=True):
         df = self.df(normalize=normalize)
         return np.dot(df['mole_fraction'].values, df['molecular_weight'].values)
-    
+
     def gas_sg(self, normalize=True):
-        mwa = self.mwa(normalize=normalize)
+        mwa = self.apparent_molecular_weight(normalize=normalize)
         return mwa / 28.96
     
     def get_pseudo_critical_properties(
@@ -97,7 +87,7 @@ class Chromatography(BaseModel):
         return cor.z_factor(p=pressure,t=temperature, ppc = cp.ppc, tpc = cp.tpc, method=z_method)
 
     def get_rhog(self,pressure=14.7,temperature=60, z_method='papay',rhog_method='real_gas',normalize=True):
-        _ma = self.mwa(normalize=normalize)
+        _ma = self.apparent_molecular_weight(normalize=normalize)
         if rhog_method == 'ideal_gas':
             _rhog = cor.rhog(p=pressure,ma=_ma,t=temperature)
         elif rhog_method == 'real_gas':
