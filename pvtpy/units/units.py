@@ -54,7 +54,7 @@ class Pressure(BaseModel):
         
     def convert_to(self, unit:PressureUnits):
         old_value = np.atleast_1d(self.value)
-        new_value = pressure_converter(old_value, self.unit.value, unit)
+        new_value = np.squeeze(pressure_converter(old_value, self.unit.value, unit))
         if new_value.ndim == 0:
             return Pressure(value=new_value.item(), unit=unit)
         return Pressure(value=new_value.tolist(), unit=unit)
@@ -69,7 +69,7 @@ class Temperature(BaseModel):
         
     def convert_to(self, unit:TemperatureUnits):
         old_value = np.atleast_1d(self.value)
-        new_value = temperature_converter(old_value, self.unit.value, unit)
+        new_value = np.squeeze(temperature_converter(old_value, self.unit.value, unit))
         if new_value.ndim == 0:
             return Temperature(value=new_value.item(), unit=unit)
         return Temperature(value=new_value.tolist(), unit=unit)

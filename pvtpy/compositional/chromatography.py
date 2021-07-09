@@ -6,7 +6,7 @@ import numpy as np
 import pandas as pd
 from .components import properties_df, Component
 from ..black_oil import correlations as cor
-
+from ..units import Pressure, Temperature
 
 class JoinItem(str, Enum):
     id = 'id'
@@ -37,7 +37,8 @@ class Chromatography(BaseModel):
         else:
             df = df.rename(columns={mole_fraction: 'mole_fraction'})
                
-        _merged = df.merge(properties_df, how='inner',left_index=True,right_on='name')
+        _merged = df.merge(properties_df, how='inner',left_index=True,right_index=True).reset_index().rename(columns={'index':'name'})
+        
 
         self.components = parse_obj_as(List[Component], _merged.to_dict(orient='records'))
 
@@ -99,3 +100,26 @@ class Chromatography(BaseModel):
         rhog = self.get_rhog(pressure=pressure,temperature=temperature, z_method=z_method,rhog_method=rhog_method,normalize=normalize)
         rhog['sv'] = 1 / rhog['rhog']
         return rhog['sv']
+    
+    def vapor_pressure(self, t:Temperature=None, temperature:float = None, temperature_unit=None, pressure_unit='psi'):
+        
+        if t is None:
+            t = Temperature(value=temperature, unit=temperature_unit)
+        
+        for i in self.components:
+            _ = i.vapor_pressure(t, pressure_unit=pressure_unit)
+            
+        return self.df()
+    
+    def ideal_flash_calculations(self, p:Pressure, t:Temperature, pressure_unit='psi'):
+        
+        p = p.convert_to('pressure_unit')
+        
+        if 'vapor_pressure' not in self.df().columns:
+            df = self.vapor_pressure(t = t, pressure_unit=pressure_unit)
+        else:
+            df = self.df()
+            
+        
+        #Estimate Equilibrium Ratios. Equation 5-4. Tarek Ahmed Equation of State and Pvt Analysis
+        df['k'] = df['vapor_pressure'] / p.value
