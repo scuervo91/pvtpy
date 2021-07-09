@@ -4,9 +4,12 @@ from typing import List
 from enum import Enum
 import numpy as np
 import pandas as pd
+from scipy.optimize import root_scalar
+#Local imports
 from .components import properties_df, Component
 from ..black_oil import correlations as cor
 from ..units import Pressure, Temperature
+from .equations import cost_flash, cost_flash_prime
 
 class JoinItem(str, Enum):
     id = 'id'
@@ -15,7 +18,7 @@ class JoinItem(str, Enum):
 class CriticalProperties(BaseModel):
     critical_pressure: float
     critical_temperature: float
-
+    
 
 class Chromatography(BaseModel):
     components: List[Component] = Field(None)
@@ -111,9 +114,9 @@ class Chromatography(BaseModel):
             
         return self.df()
     
-    def ideal_flash_calculations(self, p:Pressure, t:Temperature, pressure_unit='psi'):
+    def ideal_flash_calculations(self, p:Pressure, t:Temperature, pressure_unit='psi', method='newton'):
         
-        p = p.convert_to('pressure_unit')
+        p = p.convert_to(pressure_unit)
         
         if 'vapor_pressure' not in self.df().columns:
             df = self.vapor_pressure(t = t, pressure_unit=pressure_unit)
@@ -123,3 +126,31 @@ class Chromatography(BaseModel):
         
         #Estimate Equilibrium Ratios. Equation 5-4. Tarek Ahmed Equation of State and Pvt Analysis
         df['k'] = df['vapor_pressure'] / p.value
+        
+        #Intial Guess. page 336. Tarek Ahmed, Equation of State and Pvt Analysis
+        A = np.sum(df['mole_fraction'].values*(df['k'].values-1))
+        B = np.sum(df['mole_fraction'].values*((1/df['k'].values)-1))
+        
+        guess = A/(A+B)
+    
+        sol = root_scalar(
+            cost_flash, 
+            args=(df['mole_fraction'].values,(df['k'].values)),
+            x0=guess, 
+            method=method,
+            fprime = cost_flash_prime            
+        )
+        
+        #nv = total number of moles in the vapor (gas) phase
+        nv = sol.root 
+        
+        #nL = total number of moles in the liquid phase 
+        nl = 1- nv 
+        
+        #yi = mole fraction of component i in the gas phase
+        #xi = mole fraction of component i in the liquid phase
+        df['xi'] = df['mole_fraction'] / (nl + nv*df['k'])
+        df['yi'] = df['xi'] * df['k'] 
+        
+        
+        return df[['mole_fraction','xi','yi','k','vapor_pressure']]
