@@ -9,7 +9,7 @@ from scipy.optimize import root_scalar
 from .components import properties_df, Component
 from ..black_oil import correlations as cor
 from ..units import Pressure, Temperature
-from .equations import cost_flash, cost_flash_prime
+from .equations import cost_flash, cost_flash_prime, cost_dew_point,cost_bubble_point
 
 class JoinItem(str, Enum):
     id = 'id'
@@ -114,8 +114,7 @@ class Chromatography(BaseModel):
             
         return self.df()
     
-    def ideal_flash_calculations(self, p:Pressure, t:Temperature, pressure_unit='psi', method='newton'):
-        
+    def ideal_equilibrium_ratios(self, p:Pressure, t:Temperature, pressure_unit='psi'):
         p = p.convert_to(pressure_unit)
         
         if 'vapor_pressure' not in self.df().columns:
@@ -123,10 +122,16 @@ class Chromatography(BaseModel):
         else:
             df = self.df()
             
-        
         #Estimate Equilibrium Ratios. Equation 5-4. Tarek Ahmed Equation of State and Pvt Analysis
         df['k'] = df['vapor_pressure'] / p.value
         
+        return df
+    
+    def ideal_flash_calculations(self, p:Pressure, t:Temperature, pressure_unit='psi', method='newton'):
+              
+        #Estimate Equilibrium ratios. Assuming Ideal Solutions
+        df = self.ideal_equilibrium_ratios(p,t,pressure_unit=pressure_unit)
+               
         #Intial Guess. page 336. Tarek Ahmed, Equation of State and Pvt Analysis
         A = np.sum(df['mole_fraction'].values*(df['k'].values-1))
         B = np.sum(df['mole_fraction'].values*((1/df['k'].values)-1))
@@ -135,7 +140,7 @@ class Chromatography(BaseModel):
     
         sol = root_scalar(
             cost_flash, 
-            args=(df['mole_fraction'].values,(df['k'].values)),
+            args=(df['mole_fraction'].values,df['k'].values),
             x0=guess, 
             method=method,
             fprime = cost_flash_prime            
@@ -154,3 +159,46 @@ class Chromatography(BaseModel):
         
         
         return df[['mole_fraction','xi','yi','k','vapor_pressure']]
+    
+    def dew_point(self, t:Temperature, pressure_unit='psi', method='ideal'):
+        
+        df = self.vapor_pressure(t, pressure_unit='psi')
+        
+        guess_pd = 1 / (np.sum(df['mole_fraction'].values/df['vapor_pressure'].values))
+
+        if method=='ideal':
+            k_func = self.ideal_equilibrium_ratios
+        else:
+            raise ValueError(f'Method {method} not allowed')
+        
+        sol = root_scalar(
+            cost_dew_point,
+            args=(t,df['mole_fraction'].values, k_func, pressure_unit),
+            x0=guess_pd,
+            method='brentq',
+            bracket=[0,10000]
+        )
+              
+        return sol.root
+    
+    def bubble_point(self, t:Temperature, pressure_unit='psi', method='ideal'):
+        
+        df = self.vapor_pressure(t, pressure_unit='psi')
+        
+        guess_pb = np.sum(df['mole_fraction'].values*df['vapor_pressure'].values)
+
+        if method=='ideal':
+            k_func = self.ideal_equilibrium_ratios
+        else:
+            raise ValueError(f'Method {method} not allowed')
+        
+        sol = root_scalar(
+            cost_bubble_point,
+            args=(t,df['mole_fraction'].values, k_func, pressure_unit),
+            x0=guess_pb,
+            method='brentq',
+            bracket=[0,10000]
+        )
+              
+        return sol.root
+        
