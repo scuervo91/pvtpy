@@ -21,7 +21,7 @@ def acentric_factor(
         
         return (upper/lower)-1 
     else:
-        return -np.log10(vapor_pressure/critical_pressure) - 1
+        return -(np.log10(vapor_pressure/critical_pressure) - 1)
 
 
 # Equilibrium rations Correlations

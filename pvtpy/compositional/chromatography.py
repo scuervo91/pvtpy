@@ -119,21 +119,28 @@ class Chromatography(BaseModel):
     def acentric_factor(self,pressure_unit='psi'):
         vp_df = pd.DataFrame()
         for i in self.components:
-            vp = i.vapor_pressure(Temperature(value = i.critical_temperature.value*0.7, unit=i.critical_temperature.unit), pressure_unit=pressure_unit)
+            temp_frac = i.critical_temperature.value*0.7
+            vp = i.vapor_pressure(Temperature(value = temp_frac, unit=i.critical_temperature.unit), pressure_unit=pressure_unit)
             vp_df = vp_df.append(
                 pd.DataFrame(
                     {
                         'vapor_pressure':vp.value,
                         'vapor_pressure_unit':vp.unit.value,
                         'critical_pressure':i.critical_pressure.convert_to(pressure_unit).value,
-                        'temperature': i.critical_temperature.value*0.7
+                        'temperature': temp_frac,
+                        'critical_temperature':i.critical_temperature.convert_to('farenheit').value
                      }, 
                     index=[i.name]
                 )
             )
-        print(vp_df)
-        vp_df['acentric_factor'] = acentric_factor(vapor_pressure = vp_df['vapor_pressure'].values, critical_pressure = vp_df['critical_pressure'].values, plus_fraction=False)
-        return vp_df['acentric_factor']
+
+        vp_df['acentric_factor'] = acentric_factor(
+            vapor_pressure = vp_df['vapor_pressure'].values, 
+            critical_pressure = vp_df['critical_pressure'].values, 
+            plus_fraction=False
+        )
+        
+        return vp_df
     
     def convergence_pressure(self, method='standing'):
         if self.plus_fraction is None:
