@@ -37,12 +37,13 @@ class Component(BaseModel):
     iupac_key: constr(regex = r'^([0-9A-Z\-]+)$') = Field(None, description='Component IUPAC key')
     iupac: str = Field(None, description='Component IUPAC name')
     cas: constr(regex = r'\b[1-9]{1}[0-9]{1,6}-\d{2}-\d\b') = Field(None, description='Component CAS')
-    molecular_weight: float = Field(...,gt=0,description='Component molecular weight')
+    molecular_weight: float = Field(None,gt=0,description='Component molecular weight')
+    specific_gravity: float = Field(None,gt=0,description='Component specific_gravity')
     critical_pressure: Pressure = Field(None, description='Component critical pressure')
     critical_temperature: Temperature = Field(None, description='Component critical temperature')
     antoine_coefficients: Antoine = Field(None, description='Component Antoine coefficients')
     mole_fraction: float = Field(None, ge=0, le=1)
-    params: Dict[str, Union[int,float,str,Pressure, Temperature]] = Field(None, description='Component parameters')
+    params: Dict[str, Union[float,int,str,Pressure, Temperature]] = Field(None, description='Component parameters')
     def __init__(self,**kwargs):
         super().__init__(
             name = kwargs.pop('name',None),
@@ -50,19 +51,26 @@ class Component(BaseModel):
             iupac_key = kwargs.pop('iupac_key',None),
             iupac = kwargs.pop('iupac',None),
             cas = kwargs.pop('cas',None),
+            specific_gravity = kwargs.pop('specific_gravity',None),
             molecular_weight = kwargs.pop('molecular_weight',None),
             critical_temperature = Temperature(value=kwargs.pop('critical_temperature'),unit = kwargs.pop('critical_temperature_unit')) if 'critical_temperature' in kwargs else None,
             critical_pressure = Pressure(value=kwargs.pop('critical_pressure'),unit = kwargs.pop('critical_pressure_unit')) if 'critical_pressure' in kwargs else None,
             antoine_coefficients = Antoine(a = kwargs.pop('antoine_a'),b = kwargs.pop('antoine_b'),c = kwargs.pop('antoine_c')) if 'antoine_a' in kwargs else None,
             mole_fraction = kwargs.pop('mole_fraction',None),
-            params = kwargs if bool(kwargs) else None
+            params = kwargs.pop('params', None)
         )
         
-    def df(self):
+    def df(self, pressure_unit='psi', temperature_unit='farenheit'):
         d = self.dict(
             exclude={'critical_pressure', 'critical_temperature', 'antoine_coefficients','params','name'},
             exclude_none=True
         )
+        
+        d.update({
+            'critical_pressure': self.critical_pressure.convert_to(pressure_unit).value,
+            'critical_temperature': self.critical_temperature.convert_to(temperature_unit).value
+        })
+        
         if self.params is not None:
             for i in self.params:
                 if isinstance(self.params[i],(Pressure,Temperature)):
@@ -70,7 +78,7 @@ class Component(BaseModel):
                 else:
                     d.update({i:self.params[i]})
 
-        return pd.DataFrame(d, index=[self.name])
+        return pd.Series(d, name = self.name)
     
     
     def vapor_pressure(self, temperature: Temperature, pressure_unit='psi'):
@@ -80,13 +88,12 @@ class Component(BaseModel):
             pressure_unit=pressure_unit
         )
         
-        dict_vapor_pressure  = {'vapor_pressure':vp_value,'vapor_temperature':temperature}
-        if self.params is None:
-            self.params = dict_vapor_pressure
-        else:
-            self.params.update(dict_vapor_pressure)
+        # dict_vapor_pressure  = {'vapor_pressure':vp_value,'vapor_temperature':temperature}
+        # if self.params is None:
+        #     self.params = dict_vapor_pressure
+        # else:
+        #     self.params.update(dict_vapor_pressure)
 
-        
         return vp_value
     
 def component_from_name(name:str):

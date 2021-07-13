@@ -10,6 +10,7 @@ from .components import properties_df, Component
 from ..black_oil import correlations as cor
 from ..units import Pressure, Temperature
 from .equations import cost_flash, cost_flash_prime, cost_dew_point,cost_bubble_point
+from .correlations import equilibrium, acentric_factor
 
 class JoinItem(str, Enum):
     id = 'id'
@@ -22,7 +23,7 @@ class CriticalProperties(BaseModel):
 
 class Chromatography(BaseModel):
     components: List[Component] = Field(None)
-
+    plus_fraction: Component = Field(None, description='Add component to the chromatography')
     class Config:
         validate_assignment = True
         extra = 'forbid'
@@ -45,13 +46,16 @@ class Chromatography(BaseModel):
 
         self.components = parse_obj_as(List[Component], _merged.to_dict(orient='records'))
 
-    def df(self, normalize=True):
+    def df(self, pressure_unit='psi',temperature_unit='farenheit',normalize=True, plus_fraction=True):
         df = pd.DataFrame()
         
         for i in self.components:
-            df = df.append(i.df())
+            df = df.append(i.df(pressure_unit=pressure_unit, temperature_unit=temperature_unit))
+        
+        if plus_fraction and self.plus_fraction is not None:
+            df = df.append(self.plus_fraction.df())
             
-        if normalize:
+        if normalize and plus_fraction:
             mf = np.array(df['mole_fraction'])
             mfn = mf / mf.sum()
             df['mole_fraction'] = mfn
@@ -104,43 +108,96 @@ class Chromatography(BaseModel):
         rhog['sv'] = 1 / rhog['rhog']
         return rhog['sv']
     
-    def vapor_pressure(self, t:Temperature=None, temperature:float = None, temperature_unit=None, pressure_unit='psi'):
-        
-        if t is None:
-            t = Temperature(value=temperature, unit=temperature_unit)
-        
+    def vapor_pressure(self, t:Temperature, pressure_unit='psi'):
+        vp_df = pd.DataFrame()
         for i in self.components:
-            _ = i.vapor_pressure(t, pressure_unit=pressure_unit)
-            
-        return self.df()
+            vp = i.vapor_pressure(t, pressure_unit=pressure_unit)
+            vp_df = vp_df.append(pd.DataFrame({'vapor_pressure':vp.value,'vapor_pressure_unit':vp.unit.value}, index=[i.name]))
+
+        return vp_df
     
-    def ideal_equilibrium_ratios(self, p:Pressure, t:Temperature, pressure_unit='psi'):
-        p = p.convert_to(pressure_unit)
+    def acentric_factor(self,pressure_unit='psi'):
+        vp_df = pd.DataFrame()
+        for i in self.components:
+            vp = i.vapor_pressure(Temperature(value = i.critical_temperature.value*0.7, unit=i.critical_temperature.unit), pressure_unit=pressure_unit)
+            vp_df = vp_df.append(
+                pd.DataFrame(
+                    {
+                        'vapor_pressure':vp.value,
+                        'vapor_pressure_unit':vp.unit.value,
+                        'critical_pressure':i.critical_pressure.convert_to(pressure_unit).value,
+                        'temperature': i.critical_temperature.value*0.7
+                     }, 
+                    index=[i.name]
+                )
+            )
+        print(vp_df)
+        vp_df['acentric_factor'] = acentric_factor(vapor_pressure = vp_df['vapor_pressure'].values, critical_pressure = vp_df['critical_pressure'].values, plus_fraction=False)
+        return vp_df['acentric_factor']
+    
+    def convergence_pressure(self, method='standing'):
+        if self.plus_fraction is None:
+            raise ValueError('No plus_fraction defined')
         
-        if 'vapor_pressure' not in self.df().columns:
+        return 60*self.plus_fraction.molecular_weight - 4200
+        
+    
+    def equilibrium_ratios(self, p:Pressure, t:Temperature, pressure_unit='psi', method='wilson'):
+        
+        if method=='ideal':
+            p = p.convert_to(pressure_unit)
             df = self.vapor_pressure(t = t, pressure_unit=pressure_unit)
-        else:
-            df = self.df()
-            
-        #Estimate Equilibrium Ratios. Equation 5-4. Tarek Ahmed Equation of State and Pvt Analysis
-        df['k'] = df['vapor_pressure'] / p.value
+
+            df['k'] = equilibrium(pv=df['vapor_pressure'],p=p.value, method=method)
+                           
+            return df['k']
         
-        return df
+        if method == 'wilson':
+            
+            acentric_factor = self.acentric_factor(t)
+            df = self.df(temperature_unit='rankine')
+            df['k'] = equilibrium(
+                pc = df['critical_pressure'].values,
+                tc = df['critical_temperature'].values,
+                p = p.convert_to('psi').value,
+                t = t.convert_to('rankine').value,
+                acentric_factor = acentric_factor.values,
+                method = method
+            )
+            return df['k']
+        
+        if method == 'whitson':
+            acentric_factor = self.acentric_factor(t)
+            df = self.df(temperature_unit='rankine')
+            pk = self.convergence_pressure()    
+
+            df['k'] = equilibrium(
+                pc = df['critical_pressure'].values,
+                tc = df['critical_temperature'].values,
+                p = p.convert_to('psi').value,
+                t = t.convert_to('rankine').value,
+                acentric_factor = acentric_factor.values,
+                method = method,
+                pk = pk
+            )
+            return df['k']        
     
-    def ideal_flash_calculations(self, p:Pressure, t:Temperature, pressure_unit='psi', method='newton'):
+    
+    def flash_calculations(self, p:Pressure, t:Temperature, pressure_unit='psi', method='newton', k_method='wilson'):
               
         #Estimate Equilibrium ratios. Assuming Ideal Solutions
-        df = self.ideal_equilibrium_ratios(p,t,pressure_unit=pressure_unit)
-               
+        k = self.equilibrium_ratios(p=p,t=t,pressure_unit=pressure_unit, method=k_method)
+        
+        df = self.df()
         #Intial Guess. page 336. Tarek Ahmed, Equation of State and Pvt Analysis
-        A = np.sum(df['mole_fraction'].values*(df['k'].values-1))
-        B = np.sum(df['mole_fraction'].values*((1/df['k'].values)-1))
+        A = np.sum(df['mole_fraction'].values*(k.values-1))
+        B = np.sum(df['mole_fraction'].values*((1/k.values)-1))
         
         guess = A/(A+B)
     
         sol = root_scalar(
             cost_flash, 
-            args=(df['mole_fraction'].values,df['k'].values),
+            args=(df['mole_fraction'].values,k.values),
             x0=guess, 
             method=method,
             fprime = cost_flash_prime            
@@ -154,11 +211,11 @@ class Chromatography(BaseModel):
         
         #yi = mole fraction of component i in the gas phase
         #xi = mole fraction of component i in the liquid phase
-        df['xi'] = df['mole_fraction'] / (nl + nv*df['k'])
-        df['yi'] = df['xi'] * df['k'] 
+        df['xi'] = df['mole_fraction'] / (nl + nv*k.values)
+        df['yi'] = df['xi'] * k.values
+        df['k'] = k
         
-        
-        return df[['mole_fraction','xi','yi','k','vapor_pressure']]
+        return df[['mole_fraction','xi','yi','k']]
     
     def dew_point(self, t:Temperature, pressure_unit='psi', method='ideal'):
         
