@@ -57,7 +57,7 @@ class Component(BaseModel):
             critical_pressure = Pressure(value=kwargs.pop('critical_pressure'),unit = kwargs.pop('critical_pressure_unit')) if 'critical_pressure' in kwargs else None,
             antoine_coefficients = Antoine(a = kwargs.pop('antoine_a'),b = kwargs.pop('antoine_b'),c = kwargs.pop('antoine_c')) if 'antoine_a' in kwargs else None,
             mole_fraction = kwargs.pop('mole_fraction',None),
-            params = kwargs.pop('params', None)
+            params = kwargs.pop('params',kwargs) if bool(kwargs) else None
         )
         
     def df(self, pressure_unit='psi', temperature_unit='farenheit'):

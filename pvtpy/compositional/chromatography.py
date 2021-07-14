@@ -53,7 +53,7 @@ class Chromatography(BaseModel):
             df = df.append(i.df(pressure_unit=pressure_unit, temperature_unit=temperature_unit))
         
         if plus_fraction and self.plus_fraction is not None:
-            df = df.append(self.plus_fraction.df())
+            df = df.append(self.plus_fraction.df(pressure_unit=pressure_unit, temperature_unit=temperature_unit))
             
         if normalize and plus_fraction:
             mf = np.array(df['mole_fraction'])
@@ -142,14 +142,19 @@ class Chromatography(BaseModel):
         
         return vp_df
     
-    def convergence_pressure(self, method='standing'):
+    def convergence_pressure(self, t:Temperature, method='standing'):
         if self.plus_fraction is None:
             raise ValueError('No plus_fraction defined')
-        
-        return 60*self.plus_fraction.molecular_weight - 4200
-        
-    
-    def equilibrium_ratios(self, p:Pressure, t:Temperature, pressure_unit='psi', method='wilson'):
+        if method == 'standing':
+            return 60*self.plus_fraction.molecular_weight - 4200
+        if method == 'rzasa':
+            a = np.array([6124.3049,-2753.2538,415.42049])
+            mw_gamma = self.plus_fraction.molecular_weight * self.plus_fraction.specific_gravity
+            c = mw_gamma/(t.convert_to('rankine').value - 460)
+            c1 = np.power(c,[1,2,3])
+            return -2381.8542 + 46.31487 * mw_gamma + np.dot(a,c1)
+                
+    def equilibrium_ratios(self, p:Pressure, t:Temperature, pressure_unit='psi', method='wilson', pk_method='rzasa'):
         
         if method=='ideal':
             p = p.convert_to(pressure_unit)
@@ -161,29 +166,28 @@ class Chromatography(BaseModel):
         
         if method == 'wilson':
             
-            acentric_factor = self.acentric_factor(t)
             df = self.df(temperature_unit='rankine')
             df['k'] = equilibrium(
                 pc = df['critical_pressure'].values,
                 tc = df['critical_temperature'].values,
                 p = p.convert_to('psi').value,
                 t = t.convert_to('rankine').value,
-                acentric_factor = acentric_factor.values,
+                acentric_factor = df['acentric_factor'].values,
                 method = method
             )
             return df['k']
         
         if method == 'whitson':
-            acentric_factor = self.acentric_factor(t)
+
             df = self.df(temperature_unit='rankine')
-            pk = self.convergence_pressure()    
+            pk = self.convergence_pressure(t,method=pk_method)    
 
             df['k'] = equilibrium(
                 pc = df['critical_pressure'].values,
                 tc = df['critical_temperature'].values,
                 p = p.convert_to('psi').value,
                 t = t.convert_to('rankine').value,
-                acentric_factor = acentric_factor.values,
+                acentric_factor = df['acentric_factor'].values,
                 method = method,
                 pk = pk
             )

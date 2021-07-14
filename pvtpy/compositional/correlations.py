@@ -29,6 +29,7 @@ def acentric_factor(
 class k_correlations(str,Enum):
     wilson = 'wilson'
     whitson = 'whitson'
+    ideal = 'ideal'
 
 def equilibrium(pc=None,tc=None,p=None,t=None,acentric_factor=None, pk=None,pv=None, method='wilson'):
     """Calculate Equilibrium rations Correlations
