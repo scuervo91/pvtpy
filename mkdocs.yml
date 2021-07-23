@@ -17,9 +17,16 @@ theme:
 
 nav:
   - Home: index.md
+  - Tutorial: 
+    - PVT Tables: examples/1-pvt/1a-PVT_Tables.ipynb
+    - Chromatography: examples/2-chromatography/1b-Chromatography.ipynb
+    #- Fluids:
+    #  - Oil:
+    #  - Gas:
+    #  - Water:
 
 repo_url: https://github.com/scuervo91/pvtpy
-repo_name: scuervo91/dcapy
+repo_name: scuervo91/pvtpy
 
 plugins:
   - search
