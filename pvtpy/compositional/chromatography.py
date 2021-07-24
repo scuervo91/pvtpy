@@ -193,9 +193,7 @@ class Chromatography(BaseModel):
             )
             return df['k']        
     
-    
-    def flash_calculations(self, p:Pressure, t:Temperature, pressure_unit='psi', method='newton', k_method='wilson'):
-              
+    def phase_moles(self, p:Pressure, t:Temperature, pressure_unit='psi', method='newton', k_method='wilson'):
         #Estimate Equilibrium ratios.
         k = self.equilibrium_ratios(p=p,t=t,pressure_unit=pressure_unit, method=k_method)
         
@@ -220,6 +218,17 @@ class Chromatography(BaseModel):
         #nL = total number of moles in the liquid phase 
         nl = 1- nv 
         
+        return {'nl':nl,'nv':nv}
+    
+    def flash_calculations(self, p:Pressure, t:Temperature, pressure_unit='psi', method='newton', k_method='wilson'):
+                     
+        phase_moles = self.phase_moles(p, t, pressure_unit=pressure_unit, method=method, k_method=k_method)
+        
+        nl = phase_moles['nl']
+        nv = phase_moles['nv']
+        
+        k = self.equilibrium_ratios(p=p,t=t,pressure_unit=pressure_unit, method=k_method)
+        df = self.df()
         #yi = mole fraction of component i in the gas phase
         #xi = mole fraction of component i in the liquid phase
         df['xi'] = df['mole_fraction'] / (nl + nv*k.values)
