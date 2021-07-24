@@ -9,7 +9,7 @@ from scipy.optimize import root_scalar
 from .components import properties_df, Component
 from ..black_oil import correlations as cor
 from ..units import Pressure, Temperature
-from .equations import cost_flash, cost_flash_prime, cost_dew_point,cost_bubble_point
+from .equations import cost_flash, cost_flash_prime
 from .correlations import equilibrium, acentric_factor
 
 class JoinItem(str, Enum):
@@ -196,7 +196,7 @@ class Chromatography(BaseModel):
     
     def flash_calculations(self, p:Pressure, t:Temperature, pressure_unit='psi', method='newton', k_method='wilson'):
               
-        #Estimate Equilibrium ratios. Assuming Ideal Solutions
+        #Estimate Equilibrium ratios.
         k = self.equilibrium_ratios(p=p,t=t,pressure_unit=pressure_unit, method=k_method)
         
         df = self.df()
@@ -228,45 +228,72 @@ class Chromatography(BaseModel):
         
         return df[['mole_fraction','xi','yi','k']]
     
-    def dew_point(self, t:Temperature, pressure_unit='psi', method='ideal'):
+    def dew_point(self, t:Temperature, pressure_unit='psi', k_method='wilson', pk_method='rzasa'):
         
-        df = self.vapor_pressure(t, pressure_unit='psi')
+        df = self.df(
+            pressure_unit=pressure_unit,
+            temperature_unit='rankine',
+            normalize=True,
+            plus_fraction=True
+        )
+         
+        df['vapor_pressure'] = self.vapor_pressure(t, pressure_unit=pressure_unit)['vapor_pressure']
         
         guess_pd = 1 / (np.sum(df['mole_fraction'].values/df['vapor_pressure'].values))
 
-        if method=='ideal':
-            k_func = self.ideal_equilibrium_ratios
-        else:
-            raise ValueError(f'Method {method} not allowed')
-        
+        def cost_dew_point(p,t,z):
+            print(p)
+            k = self.equilibrium_ratios(
+                Pressure(value=p,unit=pressure_unit),
+                t,
+                pressure_unit=pressure_unit,
+                method=k_method,
+                pk_method=pk_method
+            ).values
+            return np.sum(z/k)-1
+
         sol = root_scalar(
             cost_dew_point,
-            args=(t,df['mole_fraction'].values, k_func, pressure_unit),
+            args=(t,df['mole_fraction'].values),
             x0=guess_pd,
             method='brentq',
-            bracket=[0,10000]
+            bracket=[10,10000]
         )
               
         return sol.root
-    
-    def bubble_point(self, t:Temperature, pressure_unit='psi', method='ideal'):
-        
-        df = self.vapor_pressure(t, pressure_unit='psi')
-        
-        guess_pb = np.sum(df['mole_fraction'].values*df['vapor_pressure'].values)
 
-        if method=='ideal':
-            k_func = self.ideal_equilibrium_ratios
-        else:
-            raise ValueError(f'Method {method} not allowed')
+    def bubble_point(self, t:Temperature, pressure_unit='psi', k_method='wilson', pk_method='rzasa',method=None,**kwargs):
         
+        df = self.df(
+            pressure_unit=pressure_unit,
+            temperature_unit='rankine',
+            normalize=True,
+            plus_fraction=True
+        )
+        
+        guess_a = df['mole_fraction'].values*df['critical_pressure'].values        
+        guess_b = np.exp(5.37*(1+df['acentric_factor'].values)*(1 - (df['critical_temperature'].values/t.value)))
+
+        guess_pb = np.sum(guess_a*guess_b)
+        
+        print(f'guesss {guess_pb}')
+        def cost_bubble_point(p,t,z):
+            k = self.equilibrium_ratios(
+                Pressure(value=p,unit=pressure_unit),
+                t,
+                pressure_unit=pressure_unit,
+                method=k_method,
+                pk_method=pk_method
+            ).values
+            
+            return np.sum(z*k)-1
+
         sol = root_scalar(
             cost_bubble_point,
-            args=(t,df['mole_fraction'].values, k_func, pressure_unit),
+            args=(t,df['mole_fraction'].values),
             x0=guess_pb,
-            method='brentq',
-            bracket=[0,10000]
+            method=method,
+            **kwargs
         )
               
-        return sol.root
-        
+        return sol.root    

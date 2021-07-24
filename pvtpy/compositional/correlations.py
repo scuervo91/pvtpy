@@ -56,3 +56,53 @@ def equilibrium(pc=None,tc=None,p=None,t=None,acentric_factor=None, pk=None,pv=N
     if method == 'ideal':
         return pv/p
 
+def equilibrium_h2s(p, t, pk):
+    """equilibrium_h2s Lohrenze, Clark, and Francis (1963)
+
+    Args:
+        p (float): System Pressure [psi]
+        t (float): System Temperature [°R]
+        pk (float): Convergence Pressure [psi]
+
+    Returns:
+        [type]: [description]
+    """
+    a = np.power(1 - (p/pk), 0.8)
+    b = 6.3992127 + 1399.2204*np.power(t,-1)
+    c = np.log(p)*(0.76885112+18.215052*np.power(t,-1))
+    d = 1112446.2*np.power(t,-2)
+    
+    return a * (b - c - d)
+
+def equilibrium_n2(p,t,pk):
+    """equilibrium_n2 Lohrenze, Clark, and Francis (1963)
+
+    Args:
+        p (float): System Pressure [psi]
+        t (float): System Temperature [°R]
+        pk (float): Convergence Pressure [psi]
+
+    Returns:
+        [type]: [description]
+    """
+    a = np.power(1 - (p/pk), 0.6)
+    b = 11.294748 - 1184.2409*np.power(t,-1) - 0.90459907*np.log(p)
+    
+    return a * b
+
+def equilibrium_co2(p,t,pk):
+    """equilibrium_n2 Lohrenze, Clark, and Francis (1963)
+
+    Args:
+        p (float): System Pressure [psi]
+        t (float): System Temperature [°R]
+        pk (float): Convergence Pressure [psi]
+
+    Returns:
+        [type]: [description]
+    """
+    a = np.power(1 - (p/pk), 0.6)
+    b = 7.0201913 - 152.7291*np.power(t,-1)
+    c = np.log(p)*(1.8896974 - 1719.2956*np.power(t,-1) + 644740.69*np.power(t,-2))
+    
+    return a * (b - c)

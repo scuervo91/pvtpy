@@ -65,12 +65,13 @@ class Component(BaseModel):
             exclude={'critical_pressure', 'critical_temperature', 'antoine_coefficients','params','name'},
             exclude_none=True
         )
-        
-        d.update({
-            'critical_pressure': self.critical_pressure.convert_to(pressure_unit).value,
-            'critical_temperature': self.critical_temperature.convert_to(temperature_unit).value
-        })
-        
+                
+        if self.critical_pressure is not None:
+            d.update({'critical_pressure': self.critical_pressure.convert_to(pressure_unit).value})
+
+        if self.critical_temperature is not None:
+            d.update({'critical_temperature': self.critical_temperature.convert_to(temperature_unit).value})
+
         if self.params is not None:
             for i in self.params:
                 if isinstance(self.params[i],(Pressure,Temperature)):
