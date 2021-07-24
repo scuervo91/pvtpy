@@ -81,13 +81,13 @@ class Chromatography(BaseModel):
         _tpc = np.dot(df['mole_fraction'].values, df['critical_temperature'].values)
         
         if correct:
-            _co2 = df.loc[df['name']=='carbon-dioxide', 'mole_fraction'].values[0] if 'carbon-dioxide' in df['name'].tolist() else 0
-            _n2 = df.loc[df['name']=='nitrogen', 'mole_fraction'].values[0] if 'nitrogen' in df['name'].tolist() else 0
-            _h2s = df.loc[df['name']=='hydrogen-sulfide', 'mole_fraction'].values[0] if 'hydrogen-sulfide' in df['name'].tolist() else 0
+            _co2 = df.loc['carbon-dioxide', 'mole_fraction'] if 'carbon-dioxide' in df.index.tolist() else 0
+            _n2 = df.loc['nitrogen', 'mole_fraction'] if 'nitrogen' in df.index.tolist() else 0
+            _h2s = df.loc['hydrogen-sulfide', 'mole_fraction'] if 'hydrogen-sulfide' in df.index.tolist() else 0
             cp_correction = cor.critical_properties_correction(ppc=_ppc, tpc=_tpc, co2=_co2, n2=_n2, h2s=_h2s, method=correct_method)
         else:
             cp_correction = {'critical_pressure':_ppc,'critical_temperature':_tpc}
-            
+
         return CriticalProperties(**cp_correction)
     
     def get_z(self,pressure=14.7,temperature=60, z_method='papay', cp_correction_method='wichert_aziz', normalize=True):
@@ -179,7 +179,7 @@ class Chromatography(BaseModel):
         
         if method == 'whitson':
 
-            df = self.df(temperature_unit='rankine')
+            df = self.df(temperature_unit='rankine', pressure_unit='psi')
             pk = self.convergence_pressure(t,method=pk_method)    
 
             df['k'] = equilibrium(
@@ -242,7 +242,7 @@ class Chromatography(BaseModel):
         guess_pd = 1 / (np.sum(df['mole_fraction'].values/df['vapor_pressure'].values))
 
         def cost_dew_point(p,t,z):
-            print(p)
+            
             k = self.equilibrium_ratios(
                 Pressure(value=p,unit=pressure_unit),
                 t,
@@ -267,17 +267,17 @@ class Chromatography(BaseModel):
         df = self.df(
             pressure_unit=pressure_unit,
             temperature_unit='rankine',
-            normalize=True,
-            plus_fraction=True
+            normalize=False,
+            plus_fraction=False
         )
+         
+        df['vapor_pressure'] = self.vapor_pressure(t, pressure_unit=pressure_unit)['vapor_pressure']
         
-        guess_a = df['mole_fraction'].values*df['critical_pressure'].values        
-        guess_b = np.exp(5.37*(1+df['acentric_factor'].values)*(1 - (df['critical_temperature'].values/t.value)))
-
-        guess_pb = np.sum(guess_a*guess_b)
+        guess_pb = np.sum(df['mole_fraction'].values*df['vapor_pressure'].values)
         
         print(f'guesss {guess_pb}')
         def cost_bubble_point(p,t,z):
+            print(p)
             k = self.equilibrium_ratios(
                 Pressure(value=p,unit=pressure_unit),
                 t,
@@ -290,7 +290,7 @@ class Chromatography(BaseModel):
 
         sol = root_scalar(
             cost_bubble_point,
-            args=(t,df['mole_fraction'].values),
+            args=(t,self.df()['mole_fraction'].values),
             x0=guess_pb,
             method=method,
             **kwargs
