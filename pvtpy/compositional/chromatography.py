@@ -1,6 +1,6 @@
 from logging import critical
 from pydantic import BaseModel, Field, validator, parse_obj_as
-from typing import List
+from typing import List, Union
 from enum import Enum
 import numpy as np
 import pandas as pd
@@ -28,13 +28,14 @@ class Chromatography(BaseModel):
         validate_assignment = True
         extra = 'forbid'
         
-    def from_df(self, df: pd.DataFrame, name:str = None, mole_fraction:str = None):
-        if name is None:
-            if 'name' not in df.columns:
-                raise ValueError('Column name not defined')
-            name = 'name'
-        df = df.set_index(name)
-        
+    def from_df(self, df: pd.DataFrame, name:Union[str,List] = None, mole_fraction:Union[str,List] = None):
+        #Assume names are in the index if name is None
+        if name is not None:
+            if isinstance(name, str):
+                df = df.set_index(name)
+            else:
+                df.index = name
+            
         if mole_fraction is None:
             if 'mole_fraction' not in df.columns:
                 raise ValueError('Column mole_fraction not defined')
@@ -218,14 +219,14 @@ class Chromatography(BaseModel):
         #nL = total number of moles in the liquid phase 
         nl = 1- nv 
         
-        return {'nl':nl,'nv':nv}
+        return {'liquid_moles':nl,'gas_moles':nv}
     
     def flash_calculations(self, p:Pressure, t:Temperature, pressure_unit='psi', method='newton', k_method='wilson'):
                      
         phase_moles = self.phase_moles(p, t, pressure_unit=pressure_unit, method=method, k_method=k_method)
         
-        nl = phase_moles['nl']
-        nv = phase_moles['nv']
+        nl = phase_moles['liquid_moles']
+        nv = phase_moles['gas_moles']
         
         k = self.equilibrium_ratios(p=p,t=t,pressure_unit=pressure_unit, method=k_method)
         df = self.df()
@@ -235,7 +236,7 @@ class Chromatography(BaseModel):
         df['yi'] = df['xi'] * k.values
         df['k'] = k
         
-        return df[['mole_fraction','xi','yi','k']]
+        return df[['mole_fraction','xi','yi','k']], phase_moles
     
     def dew_point(self, t:Temperature, pressure_unit='psi', k_method='wilson', pk_method='rzasa'):
         
