@@ -8,18 +8,13 @@ from scipy.optimize import root_scalar
 #Local imports
 from .components import properties_df, Component
 from ..black_oil import correlations as cor
-from ..units import Pressure, Temperature
+from ..units import Pressure, Temperature, CriticalProperties
 from .equations import cost_flash, cost_flash_prime
 from .correlations import equilibrium, acentric_factor
 
 class JoinItem(str, Enum):
     id = 'id'
     name = 'name'
-
-class CriticalProperties(BaseModel):
-    critical_pressure: float
-    critical_temperature: float
-    
 
 class Chromatography(BaseModel):
     components: List[Component] = Field(None)
@@ -75,9 +70,11 @@ class Chromatography(BaseModel):
         self,
         correct=True, 
         correct_method = 'wichert_aziz',
-        normalize=True
+        normalize=True,
+        pressure_unit='psi',
+        temperature_unit='rankine'
     ):
-        df = self.df(normalize=normalize)
+        df = self.df(normalize=normalize, pressure_unit=pressure_unit,temperature_unit=temperature_unit)
         _ppc = np.dot(df['mole_fraction'].values, df['critical_pressure'].values)
         _tpc = np.dot(df['mole_fraction'].values, df['critical_temperature'].values)
         
@@ -87,7 +84,10 @@ class Chromatography(BaseModel):
             _h2s = df.loc['hydrogen-sulfide', 'mole_fraction'] if 'hydrogen-sulfide' in df.index.tolist() else 0
             cp_correction = cor.critical_properties_correction(ppc=_ppc, tpc=_tpc, co2=_co2, n2=_n2, h2s=_h2s, method=correct_method)
         else:
-            cp_correction = {'critical_pressure':_ppc,'critical_temperature':_tpc}
+            cp_correction = {
+                'critical_pressure':Pressure(value = _ppc, unit=pressure_unit),
+                'critical_temperature': Temperature(value=_tpc, unit=temperature_unit)
+            }
 
         return CriticalProperties(**cp_correction)
     

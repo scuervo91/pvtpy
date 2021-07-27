@@ -1,4 +1,5 @@
 from logging import critical
+from pvtpy.units.units import CriticalProperties
 import numpy as np
 import pandas as pd
 from pydantic import BaseModel, constr, Field, parse_obj_as
@@ -7,6 +8,7 @@ import os
 
 #local imports
 from ..units import Pressure, Temperature
+from ..eos import VanDerWalls
 
 #upload table property list
 file_dir = os.path.dirname(__file__)
@@ -29,7 +31,9 @@ class Antoine(BaseModel):
         pressure_value = np.power(10,right_part)
         pressure_obj = Pressure(value = pressure_value, unit = 'bar')
         return pressure_obj.convert_to(pressure_unit)
-        
+
+
+    
 
 class Component(BaseModel):
     name: str = Field(..., description='Component name')
@@ -42,6 +46,7 @@ class Component(BaseModel):
     critical_pressure: Pressure = Field(None, description='Component critical pressure')
     critical_temperature: Temperature = Field(None, description='Component critical temperature')
     antoine_coefficients: Antoine = Field(None, description='Component Antoine coefficients')
+    van_der_walls_coefficients: VanDerWalls = Field(VanDerWalls(), description='Component van der waals coefficients')
     mole_fraction: float = Field(None, ge=0, le=1)
     params: Dict[str, Union[float,int,str,Pressure, Temperature]] = Field(None, description='Component parameters')
     def __init__(self,**kwargs):
@@ -81,7 +86,11 @@ class Component(BaseModel):
 
         return pd.Series(d, name = self.name)
     
-    
+    def critical_properties(self):
+        return  CriticalProperties(
+            critical_pressure = self.critical_pressure,
+            critical_temperature = self.critical_temperature)
+
     def vapor_pressure(self, temperature: Temperature, pressure_unit='psi'):
         
         vp_value = self.antoine_coefficients.vapor_pressure(
@@ -97,13 +106,19 @@ class Component(BaseModel):
 
         return vp_value
     
+    def calculate_vdw(self):
+        cp = self.critical_properties()
+        coef = self.van_der_walls_coefficients.coef_ab(cp)
+        
+        return coef
+    
 def component_from_name(name:str):
-    if name not in properties_df['name'].tolist():
+    if name not in properties_df.index.tolist():
         raise ValueError(f'{name} not found in database')
     
-    comp_df = properties_df.loc[name,:]
+    comp_df = properties_df.loc[[name],:].reset_index().rename(columns={'index':'name'})
     
-    return parse_obj_as(Component,comp_df.dict(orient='records')[0])
+    return parse_obj_as(Component,comp_df.to_dict(orient='records')[0])
         
         
 

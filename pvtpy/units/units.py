@@ -73,3 +73,9 @@ class Temperature(BaseModel):
         if new_value.ndim == 0:
             return Temperature(value=new_value.item(), unit=unit)
         return Temperature(value=new_value.tolist(), unit=unit)
+
+class CriticalProperties(BaseModel):
+    critical_pressure: Pressure
+    critical_temperature: Temperature
+
+
