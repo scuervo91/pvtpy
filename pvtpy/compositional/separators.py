@@ -46,16 +46,42 @@ class SeparatorTest(BaseModel):
             
             chr_ = Chromatography()
             chr_.from_df(flash_df, mole_fraction='xi')
-            
+                       
             if plus_fraction:
                 plus_component = self.initial_chromatography.plus_fraction.copy()
-                plus_component.mole_fraction = flash_df['mole_fraction'].iloc[-1]
+                plus_component.mole_fraction = flash_df.loc[plus_component.name,'xi']
                 chr_.plus_fraction = plus_component
             
             stage.phase_moles = phase_moles
             stage.chromatography = chr_
             
         return True
+    
+    def final_moles(self):
+        nl = 1
+        for stage in self.stages:
+            nl *= stage.phase_moles.liquid_moles
+            
+        nv = 1 - nl
+            
+        return PhaseMoles(liquid_moles=nl, gas_moles=nv)
+    
+    def final_molecular_weight(self):
+        final_stage = self.stages[-1]
+        
+        return final_stage.chromatography.apparent_molecular_weight()
+    
+    def gas_solubility(self, rho):
+        final_moles = self.final_moles()
+        ma = self.final_molecular_weight()
+        return (2130.331* final_moles.gas_moles*rho)/(final_moles.liquid_moles * ma)
+    
+    def volumetric_factor(self, rhoi, rho):
+        final_moles = self.final_moles()
+        ma = self.final_molecular_weight()
+        mai = self.initial_chromatography.apparent_molecular_weight()
+        
+        return (mai * rho)/(rhoi*final_moles.liquid_moles * ma)
         
         
     
