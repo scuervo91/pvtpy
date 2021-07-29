@@ -1,4 +1,5 @@
 from logging import critical
+from pvtpy.eos import redlich_kwong
 from pvtpy.units.units import CriticalProperties
 import numpy as np
 import pandas as pd
@@ -8,7 +9,7 @@ import os
 
 #local imports
 from ..units import Pressure, Temperature
-from ..eos import VanDerWalls
+from ..eos import VanDerWalls, RedlichKwong
 
 #upload table property list
 file_dir = os.path.dirname(__file__)
@@ -46,7 +47,8 @@ class Component(BaseModel):
     critical_pressure: Pressure = Field(None, description='Component critical pressure')
     critical_temperature: Temperature = Field(None, description='Component critical temperature')
     antoine_coefficients: Antoine = Field(None, description='Component Antoine coefficients')
-    van_der_walls_coefficients: VanDerWalls = Field(VanDerWalls(), description='Component van der waals coefficients')
+    van_der_walls: VanDerWalls = Field(VanDerWalls(), description='Component van der waals coefficients')
+    redlich_kwong: RedlichKwong = Field(RedlichKwong(), description='Component van der waals coefficients')
     mole_fraction: float = Field(None, ge=0, le=1)
     params: Dict[str, Union[float,int,str,Pressure, Temperature]] = Field(None, description='Component parameters')
     def __init__(self,**kwargs):
