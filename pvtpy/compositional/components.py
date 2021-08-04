@@ -1,5 +1,5 @@
 from logging import critical
-from pvtpy.eos import redlich_kwong
+from pvtpy.eos import redlich_kwong, soave_redlich_kwong
 from pvtpy.units.units import CriticalProperties
 import numpy as np
 import pandas as pd
@@ -9,7 +9,7 @@ import os
 
 #local imports
 from ..units import Pressure, Temperature
-from ..eos import VanDerWalls, RedlichKwong
+from ..eos import VanDerWalls, RedlichKwong, SoaveRedlichKwong
 
 #upload table property list
 file_dir = os.path.dirname(__file__)
@@ -47,8 +47,9 @@ class Component(BaseModel):
     critical_pressure: Pressure = Field(None, description='Component critical pressure')
     critical_temperature: Temperature = Field(None, description='Component critical temperature')
     antoine_coefficients: Antoine = Field(None, description='Component Antoine coefficients')
-    van_der_walls: VanDerWalls = Field(VanDerWalls(), description='Component van der waals coefficients')
-    redlich_kwong: RedlichKwong = Field(RedlichKwong(), description='Component van der waals coefficients')
+    van_der_walls: VanDerWalls = Field(VanDerWalls())
+    redlich_kwong: RedlichKwong = Field(RedlichKwong())
+    soave_redlich_kwong: SoaveRedlichKwong = Field(SoaveRedlichKwong())
     mole_fraction: float = Field(None, ge=0, le=1)
     params: Dict[str, Union[float,int,str,Pressure, Temperature]] = Field(None, description='Component parameters')
     
@@ -97,6 +98,14 @@ class Component(BaseModel):
             d.update({
                 'vdw_a':self.vdw.a,
                 'vdw_b':self.vdw.b,
+            })
+            
+        if self.soave_redlich_kwong.a is not None and self.soave_redlich_kwong.b is not None:
+            d.update({
+                'srk_a':self.soave_redlich_kwong.a,
+                'srk_b':self.soave_redlich_kwong.b,
+                'srk_alpha':self.soave_redlich_kwong.alpha,
+                
             })
 
         return pd.Series(d, name = self.name)

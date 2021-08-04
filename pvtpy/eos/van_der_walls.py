@@ -37,12 +37,21 @@ class VanDerWalls(BaseModel):
     def estimate_densities(self, p:Pressure, t:Temperature, molecular_weight:float, R=10.73):
         poly = self.cubic_poly(p, t, R=R)
         
-        roots = poly.roots()
-        gas_root = roots.max()
-        liquid_root = roots.min()
-        
         pressure = p.convert_to('psi').value
         temperature = t.convert_to('rankine').value
+        
+        roots = poly.roots()
+        real_roots = np.isreal(roots)
+        
+        if real_roots.sum() == 1:
+            root_z = roots[real_roots].real
+            rho = (pressure*molecular_weight)/(root_z*R*temperature)
+            
+            return {'rho':rho}
+                    
+        positive_roots = roots[roots > 0]
+        gas_root = positive_roots.max()
+        liquid_root = positive_roots.min()
         
         rho_gas = (pressure*molecular_weight)/(gas_root*R*temperature)
         rho_liquid = (pressure*molecular_weight)/(liquid_root*R*temperature)

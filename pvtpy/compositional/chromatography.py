@@ -11,7 +11,7 @@ from ..black_oil import correlations as cor
 from ..units import Pressure, Temperature, CriticalProperties
 from .equations import cost_flash, cost_flash_prime
 from .correlations import equilibrium, acentric_factor
-from ..eos import RedlichKwong
+from ..eos import RedlichKwong, SoaveRedlichKwong
 class JoinItem(str, Enum):
     id = 'id'
     name = 'name'
@@ -19,7 +19,8 @@ class JoinItem(str, Enum):
 class Chromatography(BaseModel):
     components: List[Component] = Field(None)
     plus_fraction: Component = Field(None, description='Add component to the chromatography')
-    redlich_kwong: RedlichKwong = Field(RedlichKwong(), description='Component van der waals coefficients')
+    redlich_kwong: RedlichKwong = Field(RedlichKwong())
+    soave_redlich_kwong: SoaveRedlichKwong = Field(SoaveRedlichKwong())
 
     class Config:
         validate_assignment = True
@@ -329,6 +330,32 @@ class Chromatography(BaseModel):
             df['mole_fraction'].values,
             df['rk_a'].values,
             df['rk_b'].values
+        )
+        
+        return a, b
+    
+    def soave_redlich_kwong_components_coef(self, t:Temperature):
+        for comp in self.components:
+            cp_comp = comp.critical_properties()
+            omega = comp.params['acentric_factor']
+            comp.soave_redlich_kwong.coef_ab(cp_comp)
+            comp.soave_redlich_kwong.coef_alpha(t, cp_comp, omega)
+        
+        if self.plus_fraction:
+            cp_plus = self.plus_fraction.critical_properties()
+            omega_plus = self.plus_fraction.params['acentric_factor']
+            self.plus_fraction.soave_redlich_kwong.coef_ab(cp_plus)
+            self.plus_fraction.soave_redlich_kwong.coef_alpha(t, cp_comp, omega_plus)
+            
+    def soave_redlich_kwong_mix_coef(self, k=None):
+        df = self.df(columns=['mole_fraction','srk_a','srk_b','srk_alpha'])
+        
+        a, b = self.soave_redlich_kwong.mixture_coef_ab(
+            df['mole_fraction'].values,
+            df['srk_a'].values,
+            df['srk_b'].values,
+            df['srk_alpha'].values,
+            k = k
         )
         
         return a, b
