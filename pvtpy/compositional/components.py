@@ -51,6 +51,7 @@ class Component(BaseModel):
     redlich_kwong: RedlichKwong = Field(RedlichKwong(), description='Component van der waals coefficients')
     mole_fraction: float = Field(None, ge=0, le=1)
     params: Dict[str, Union[float,int,str,Pressure, Temperature]] = Field(None, description='Component parameters')
+    
     def __init__(self,**kwargs):
         super().__init__(
             name = kwargs.pop('name',None),
@@ -85,6 +86,18 @@ class Component(BaseModel):
                     d.update({i:self.params[i].value})
                 else:
                     d.update({i:self.params[i]})
+        
+        if self.redlich_kwong.a is not None and self.redlich_kwong.b is not None:
+            d.update({
+                'rk_a':self.redlich_kwong.a,
+                'rk_b':self.redlich_kwong.b,
+            })
+
+        if self.van_der_walls.a is not None and self.van_der_walls.b is not None:
+            d.update({
+                'vdw_a':self.vdw.a,
+                'vdw_b':self.vdw.b,
+            })
 
         return pd.Series(d, name = self.name)
     
@@ -107,13 +120,7 @@ class Component(BaseModel):
         #     self.params.update(dict_vapor_pressure)
 
         return vp_value
-    
-    def calculate_vdw(self):
-        cp = self.critical_properties()
-        coef = self.van_der_walls_coefficients.coef_ab(cp)
         
-        return coef
-    
 def component_from_name(name:str):
     if name not in properties_df.index.tolist():
         raise ValueError(f'{name} not found in database')

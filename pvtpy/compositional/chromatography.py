@@ -11,7 +11,7 @@ from ..black_oil import correlations as cor
 from ..units import Pressure, Temperature, CriticalProperties
 from .equations import cost_flash, cost_flash_prime
 from .correlations import equilibrium, acentric_factor
-
+from ..eos import RedlichKwong
 class JoinItem(str, Enum):
     id = 'id'
     name = 'name'
@@ -19,6 +19,8 @@ class JoinItem(str, Enum):
 class Chromatography(BaseModel):
     components: List[Component] = Field(None)
     plus_fraction: Component = Field(None, description='Add component to the chromatography')
+    redlich_kwong: RedlichKwong = Field(RedlichKwong(), description='Component van der waals coefficients')
+
     class Config:
         validate_assignment = True
         extra = 'forbid'
@@ -42,7 +44,7 @@ class Chromatography(BaseModel):
 
         self.components = parse_obj_as(List[Component], _merged.to_dict(orient='records'))
 
-    def df(self, pressure_unit='psi',temperature_unit='farenheit',normalize=True, plus_fraction=True):
+    def df(self, pressure_unit='psi',temperature_unit='farenheit',normalize=True, plus_fraction=True, columns=None):
         df = pd.DataFrame()
         
         for i in self.components:
@@ -55,11 +57,14 @@ class Chromatography(BaseModel):
             mf = np.array(df['mole_fraction'])
             mfn = mf / mf.sum()
             df['mole_fraction'] = mfn
+        
+        if columns is not None:
+            df = df[columns]
             
         return df
     
     def apparent_molecular_weight(self, normalize=True):
-        df = self.df(normalize=normalize)
+        df = self.df(normalize=normalize, columns=['molecular_weight','mole_fraction'])
         return np.dot(df['mole_fraction'].values, df['molecular_weight'].values)
 
     def gas_sg(self, normalize=True):
@@ -306,4 +311,24 @@ class Chromatography(BaseModel):
             **kwargs
         )
               
-        return sol.root    
+        return sol.root 
+
+    def redlich_kwong_components_coef(self):
+        for comp in self.components:
+            cp_comp = comp.critical_properties()
+            comp.redlich_kwong.coef_ab(cp_comp)
+        
+        if self.plus_fraction:
+            cp_plus = self.plus_fraction.critical_properties()
+            self.plus_fraction.redlich_kwong.coef_ab(cp_plus)
+            
+    def redlich_kwong_mix_coef(self):
+        df = self.df(columns=['mole_fraction','rk_a','rk_b'])
+        
+        a, b = self.redlich_kwong.mixture_coef_ab(
+            df['mole_fraction'].values,
+            df['rk_a'].values,
+            df['rk_b'].values
+        )
+        
+        return a, b

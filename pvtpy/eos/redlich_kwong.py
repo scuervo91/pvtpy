@@ -18,6 +18,16 @@ class RedlichKwong(BaseModel):
         
         return a, b
     
+    def mixture_coef_ab(self, mole_fraction, a, b):
+        # Redlich-Kwong coefficients from Hydrocarbon mixtures
+        am = np.square(np.dot(mole_fraction, np.sqrt(a)))
+        bm = np.dot(mole_fraction, b)
+        
+        self.a = am
+        self.b = bm
+        
+        return am, bm
+    
     def coef_AB(self, p:Pressure, t:Temperature, R=10.73):
         pressure = p.convert_to('psi').value
         temperature = t.convert_to('rankine').value
@@ -37,12 +47,20 @@ class RedlichKwong(BaseModel):
     def estimate_densities(self, p:Pressure, t:Temperature, molecular_weight:float, R=10.73):
         poly = self.cubic_poly(p, t, R=R)
         
-        roots = poly.roots()
-        gas_root = roots.max()
-        liquid_root = roots.min()
-        
         pressure = p.convert_to('psi').value
         temperature = t.convert_to('rankine').value
+        
+        roots = poly.roots()
+        real_roots = np.isreal(roots)
+        
+        if real_roots.sum() == 1:
+            root_z = roots[real_roots].real
+            rho = (pressure*molecular_weight)/(root_z*R*temperature)
+            
+            return {'rho':rho}
+                    
+        gas_root = roots.max()
+        liquid_root = roots.min()
         
         rho_gas = (pressure*molecular_weight)/(gas_root*R*temperature)
         rho_liquid = (pressure*molecular_weight)/(liquid_root*R*temperature)
