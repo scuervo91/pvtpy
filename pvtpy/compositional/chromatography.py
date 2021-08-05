@@ -1,4 +1,5 @@
 from logging import critical
+from pvtpy.eos import peng_robinson
 from pydantic import BaseModel, Field, validator, parse_obj_as
 from typing import List, Union
 from enum import Enum
@@ -11,7 +12,7 @@ from ..black_oil import correlations as cor
 from ..units import Pressure, Temperature, CriticalProperties
 from .equations import cost_flash, cost_flash_prime
 from .correlations import equilibrium, acentric_factor
-from ..eos import RedlichKwong, SoaveRedlichKwong
+from ..eos import RedlichKwong, SoaveRedlichKwong, PengRobinson
 class JoinItem(str, Enum):
     id = 'id'
     name = 'name'
@@ -21,6 +22,7 @@ class Chromatography(BaseModel):
     plus_fraction: Component = Field(None, description='Add component to the chromatography')
     redlich_kwong: RedlichKwong = Field(RedlichKwong())
     soave_redlich_kwong: SoaveRedlichKwong = Field(SoaveRedlichKwong())
+    peng_robinson: PengRobinson = Field(PengRobinson())
 
     class Config:
         validate_assignment = True
@@ -355,6 +357,32 @@ class Chromatography(BaseModel):
             df['srk_a'].values,
             df['srk_b'].values,
             df['srk_alpha'].values,
+            k = k
+        )
+        
+        return a, b
+
+    def peng_robinson_components_coef(self, t:Temperature):
+        for comp in self.components:
+            cp_comp = comp.critical_properties()
+            omega = comp.params['acentric_factor']
+            comp.peng_robinson.coef_ab(cp_comp)
+            comp.peng_robinson.coef_alpha(t, cp_comp, omega)
+        
+        if self.plus_fraction:
+            cp_plus = self.plus_fraction.critical_properties()
+            omega_plus = self.plus_fraction.params['acentric_factor']
+            self.plus_fraction.peng_robinson.coef_ab(cp_plus)
+            self.plus_fraction.peng_robinson.coef_alpha(t, cp_comp, omega_plus)
+            
+    def peng_robinson_mix_coef(self, k=None):
+        df = self.df(columns=['mole_fraction','pr_a','pr_b','pr_alpha'])
+        
+        a, b = self.peng_robinson.mixture_coef_ab(
+            df['mole_fraction'].values,
+            df['pr_a'].values,
+            df['pr_b'].values,
+            df['pr_alpha'].values,
             k = k
         )
         

@@ -1,5 +1,5 @@
 from logging import critical
-from pvtpy.eos import redlich_kwong, soave_redlich_kwong
+from pvtpy.eos import peng_robinson, redlich_kwong, soave_redlich_kwong
 from pvtpy.units.units import CriticalProperties
 import numpy as np
 import pandas as pd
@@ -9,7 +9,7 @@ import os
 
 #local imports
 from ..units import Pressure, Temperature
-from ..eos import VanDerWalls, RedlichKwong, SoaveRedlichKwong
+from ..eos import VanDerWalls, RedlichKwong, SoaveRedlichKwong, PengRobinson
 
 #upload table property list
 file_dir = os.path.dirname(__file__)
@@ -50,6 +50,7 @@ class Component(BaseModel):
     van_der_walls: VanDerWalls = Field(VanDerWalls())
     redlich_kwong: RedlichKwong = Field(RedlichKwong())
     soave_redlich_kwong: SoaveRedlichKwong = Field(SoaveRedlichKwong())
+    peng_robinson: PengRobinson = Field(PengRobinson())
     mole_fraction: float = Field(None, ge=0, le=1)
     params: Dict[str, Union[float,int,str,Pressure, Temperature]] = Field(None, description='Component parameters')
     
@@ -105,6 +106,14 @@ class Component(BaseModel):
                 'srk_a':self.soave_redlich_kwong.a,
                 'srk_b':self.soave_redlich_kwong.b,
                 'srk_alpha':self.soave_redlich_kwong.alpha,
+                
+            })
+            
+        if self.peng_robinson.a is not None and self.peng_robinson.b is not None:
+            d.update({
+                'pr_a':self.peng_robinson.a,
+                'pr_b':self.peng_robinson.b,
+                'pr_alpha':self.peng_robinson.alpha,
                 
             })
 
