@@ -28,9 +28,9 @@ nav:
       - Separator test: examples/3-chromatography/3c-Separators.ipynb
     - Equations of State:
       - Pure Components:
-        - Van Der Walls: examples/3-Eos/1-van_der_walls.ipynb
-        - Redlich Kwong: examples/3-Eos/2-redlich_kwong.ipynb
-        - Soave Redlich Kwong: examples/3-Eos/3-soave_redlich_kwong.ipynb
+        - Van Der Walls: examples/4-Eos/1-van_der_walls.ipynb
+        - Redlich Kwong: examples/4-Eos/2-redlich_kwong.ipynb
+        - Soave Redlich Kwong: examples/4-Eos/3-soave_redlich_kwong.ipynb
       - Mixtures:
         - Redlich Kwong: examples/4-Eos/2a-redlich_kwong_mixtures.ipynb
         - Soave Redlich Kwong: examples/4-Eos/3a-soave_redlich_kwong_mixtures.ipynb
