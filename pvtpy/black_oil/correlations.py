@@ -828,6 +828,7 @@ def rsw(p=None, t=None, s=None, method='culberson'):
 
 class bw_correlations(str,Enum):
     mccain = 'mccain'
+    mccoy = 'mccoy'
 
 def bw(p=None, t=None, pb=0, cw=0, s=None, method='mccain'):
     """
