@@ -1,9 +1,14 @@
-# pvtpy (On development)
+# pvtpy
 
 + **Documentation** [http://scuervo91.github.io/pvtpy](http://scuervo91.github.io/pvtpy)
 + **Sorce Code** [https://github.com/scuervo91/pvtpy](https://github.com/scuervo91/pvtpy)
 
-{package description}
+Python library to handle PVT for Oil & Gas Processes. Includes some correlations to easily create tables from main fluids attributes
+
++ **PVT Tables**: Oil, Gas & Water tables with custom properties to interpolate
++ **Chromatography**: Create Chromatrography object with Plus component.
++ **Correlations**: Correlations to estimate PVT Tables from main Attributes
++ **Equation Of State**: First Implementation of EOS to estimate Density (On dev) 
 
 
 ## Requirements
@@ -23,4 +28,4 @@ $ pip install pvtpy
 
 ## License
 
-This project is licensed under the terms of the MIT license.
+This project is licensed under the terms of the MIT license

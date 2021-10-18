@@ -19,22 +19,22 @@ nav:
   - Home: index.md
   - Tutorial: 
     - PVT Tables: examples/1-pvt/1a-PVT_Tables.ipynb
+    - Fluids:
+      - Oil: examples/2-Fluids/2a_Oil.ipynb
+      - Gas: examples/2-Fluids/2b_Gas.ipynb
+      - Water: examples/2-Fluids/2c_Water.ipynb
     - Compositional: 
-      - Chromatography: examples/2-chromatography/1b-Chromatography.ipynb
-      - Separator test: examples/2-chromatography/1c-Separators.ipynb
+      - Chromatography: examples/3-chromatography/3b-Chromatography.ipynb
+      - Separator test: examples/3-chromatography/3c-Separators.ipynb
     - Equations of State:
       - Pure Components:
         - Van Der Walls: examples/3-Eos/1-van_der_walls.ipynb
         - Redlich Kwong: examples/3-Eos/2-redlich_kwong.ipynb
         - Soave Redlich Kwong: examples/3-Eos/3-soave_redlich_kwong.ipynb
       - Mixtures:
-        - Redlich Kwong: examples/3-Eos/2a-redlich_kwong_mixtures.ipynb
-        - Soave Redlich Kwong: examples/3-Eos/3a-soave_redlich_kwong_mixtures.ipynb
-        - Peng Robinson: examples/3-Eos/4a-peng_robinson_mixtures.ipynb
-    #- Fluids:
-    #  - Oil:
-    #  - Gas:
-    #  - Water:
+        - Redlich Kwong: examples/4-Eos/2a-redlich_kwong_mixtures.ipynb
+        - Soave Redlich Kwong: examples/4-Eos/3a-soave_redlich_kwong_mixtures.ipynb
+        - Peng Robinson: examples/4-Eos/4a-peng_robinson_mixtures.ipynb
 
 repo_url: https://github.com/scuervo91/pvtpy
 repo_name: scuervo91/pvtpy
