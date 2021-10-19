@@ -71,13 +71,13 @@ class Gas(FluidBase):
         z_cor = cor.z_factor(
             p=p_range, 
             t=self.initial_conditions.temperature.value, 
-            ppc=_cp.ppc, 
-            tpc=_cp.tpc, 
+            ppc=_cp.critical_pressure.value, 
+            tpc=_cp.critical_temperature.value, 
             method=correlations.z)
         
         # Density 
         if self.chromatography is not None:
-            _ma = self.chromatography.mwa(normalize=normalize)
+            _ma = self.chromatography.apparent_molecular_weight(normalize=normalize)
         else:
             _ma = self.sg * 28.96
         # Density     

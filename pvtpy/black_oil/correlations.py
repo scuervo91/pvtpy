@@ -3,19 +3,22 @@ import pandas as pd
 from numpy.polynomial.polynomial import polyval
 from scipy.interpolate import interp1d
 from enum import Enum
-from pydantic import BaseModel, Field
+from typing import Union, List
+from pydantic import BaseModel, Field, validate_arguments
+from ..units import Pressure, Temperature, CriticalProperties
 
 #####################################################################################
 #####################################################################################
 ############################ OIL CORRELATIONS #######################################
 
-def api_to_sg(api):
+@validate_arguments(config=dict(arbitrary_types_allowed=True))
+def api_to_sg(api:Union[np.ndarray,float,List[float]]):
     api = np.atleast_1d(api)
     sg = 141.5 / (131.5 + api)
     return sg
 
-
-def sg_to_api(sg):
+@validate_arguments(config=dict(arbitrary_types_allowed=True))
+def sg_to_api(sg:Union[np.ndarray,float,List[float]]):
     sg = np.atleast_1d(sg)
     api = (141.5 / sg) - 131.5
     return api
@@ -27,7 +30,14 @@ def sg_to_api(sg):
 # Correction by Non-Hydrocarbon gases
 
 # Correction by N2
-def n2_correction(api=None, temp=None, y=0):
+@validate_arguments(config=dict(arbitrary_types_allowed=True))
+def n2_correction(
+    api:Union[np.ndarray,float,List[float]]=None, 
+    temperature:Temperature=None, 
+    y:float=0
+):
+    
+    temp = temperature.convert_to('farenheit').value
     if y == 0:
         cn2 = 1
     else:
@@ -35,16 +45,22 @@ def n2_correction(api=None, temp=None, y=0):
                     (1.954e-11 * np.power(api, 4.699) * temp) + (0.027 * api - 2.366)) * np.power(y, 2)
     return cn2
 
-
-def co2_correction(y=0, temp=None):
+@validate_arguments(config=dict(arbitrary_types_allowed=True))
+def co2_correction(y:float=0, temperature:Temperature=None):
+    temp = temperature.convert_to('farenheit').value
     if y == 0:
         cco2 = 1
     else:
         cco2 = 1.0 - 693.8 * y * np.power(temp, -1.553)
     return cco2
 
-
-def h2s_correction(api=None, y=0, temp=None):
+@validate_arguments(config=dict(arbitrary_types_allowed=True))
+def h2s_correction(
+    api:Union[np.ndarray,float,List[float]]=None, 
+    y:float=0, 
+    temperature:Temperature=None
+):
+    temp = temperature.convert_to('farenheit').value
     if y == 0:
         ch2s = 1
     else:
@@ -59,7 +75,19 @@ class pb_correlations(str,Enum):
     glaso = 'glaso'
 
 # Bubble point
-def pb(rs=None, temp=None, sg_gas=None, api=None, method='standing', correction=True, **kwargs):
+@validate_arguments(config=dict(arbitrary_types_allowed=True))
+def pb(
+    rs:Union[np.ndarray,float,List[float]]=None, 
+    temperature:Temperature=None, 
+    sg_gas:Union[np.ndarray,float,List[float]]=None, 
+    api:Union[np.ndarray,float,List[float]]=None, 
+    method:Union[pb_correlations,List[pb_correlations]]=pb_correlations.standing, 
+    correction:bool=True, 
+    y_n2:float=0,
+    y_co2:float=0,
+    y_h2s:float=0,
+    **kwargs
+):
     """
     Estimate the bubble point pressure using Correlations
 
@@ -77,42 +105,30 @@ def pb(rs=None, temp=None, sg_gas=None, api=None, method='standing', correction=
 
     Source: Correlaciones Numericas PVT - Carlos Banzer
     """
-    assert isinstance(rs, (int, float, list, np.ndarray))
     rs = np.atleast_1d(rs)
-
-    assert isinstance(temp, (int, float, list, np.ndarray))
-    temp = np.atleast_1d(temp)
-
-    assert isinstance(sg_gas, (int, float, list, np.ndarray))
     sg_gas = np.atleast_1d(sg_gas)
-
-    assert isinstance(api, (int, float, list, np.ndarray))
     api = np.atleast_1d(api)
 
     assert isinstance(method, (str, list))
 
     methods = []
 
-    if isinstance(method, str):
-        methods.append(method)
+    if isinstance(method, pb_correlations):
+        methods.append(method.value)
         multiple = False
     else:
-        methods.extend(method)
+        methods.extend([i.value for i in method])
         multiple = True
 
     # Corrections for non Hydrocarbon gases
-    y_n2 = kwargs.pop('y_n2', 0)
-    y_co2 = kwargs.pop('y_co2', 0)
-    y_h2s = kwargs.pop('y_h2s', 0)
 
-    cn2 = n2_correction(y=y_n2, api=api, temp=temp) if correction == True else 1
-    cco2 = co2_correction(y=y_co2, temp=temp) if correction == True else 1
-    ch2s = h2s_correction(y=y_h2s, api=api, temp=temp) if correction == True else 1
-
+    cn2 = n2_correction(y=y_n2, api=api, temperature=temperature) if correction == True else 1
+    cco2 = co2_correction(y=y_co2, temperature=temperature) if correction == True else 1
+    ch2s = h2s_correction(y=y_h2s, api=api, temperature=temperature) if correction == True else 1
     pb_dict = {}
 
     if 'standing' in methods:
-        f = np.power(rs / sg_gas, 0.83) * np.power(10, 0.00091 * temp - 0.0125 * api)
+        f = np.power(rs / sg_gas, 0.83) * np.power(10, 0.00091 * temperature.convert_to('farenheit').value - 0.0125 * api)
         pb_standing = 18.2 * (f - 1.4)
         pb = pb_standing * cn2 * cco2 * ch2s
         pb_dict['pb_standing'] = pb
@@ -131,7 +147,7 @@ def pb(rs=None, temp=None, sg_gas=None, api=None, method='standing', correction=
         pb_factor[yg <= 0.6] = 0.679 * np.exp(2.786 * yg[yg <= 0.6]) - 0.323
         pb_factor[yg > 0.6] = 8.26 * np.power(yg[yg > 0.6], 3.56) + 1.95
 
-        temp_r = temp + 459.67
+        temp_r = temperature.convert_to('rankine').value
         pb_laster = pb_factor * temp_r / sg_gas
 
         pb = pb_laster * cn2 * cco2 * ch2s
@@ -152,18 +168,18 @@ def pb(rs=None, temp=None, sg_gas=None, api=None, method='standing', correction=
         c3[api <= 30] = 25.724
         c3[api > 30] = 23.931
 
-        pb_vasquez = np.power(rs / (c1 * sg_gas * np.exp((c3 * api) / (temp + 460))), 1 / c2)
+        pb_vasquez = np.power(rs / (c1 * sg_gas * np.exp((c3 * api) / temperature.convert_to('rankine').value)), 1 / c2)
         pb = pb_vasquez * cn2 * cco2 * ch2s
         pb_dict['pb_vazquez_beggs'] = pb
 
     if 'glaso' in methods:
-        f = np.power(rs / sg_gas, 0.816) * ((np.power(temp, 0.172)) / (np.power(api, 0.989)))
+        f = np.power(rs / sg_gas, 0.816) * ((np.power(temperature.convert_to('farenheit').value, 0.172)) / (np.power(api, 0.989)))
 
         pb_glaso = np.power(10, polyval(np.log10(f), [1.7669, 1.7447, -0.30218]))
         pb = pb_glaso * cn2 * cco2 * ch2s
         pb_dict['pb_glaso'] = pb
 
-    pb_df = pd.DataFrame(pb_dict, index=temp) if multiple == True else pd.DataFrame({'pb': pb}, index=temp)
+    pb_df = pd.DataFrame(pb_dict, index=[temperature.value]) if multiple == True else pd.DataFrame({'pb': pb}, index=[temperature.value])
     pb_df.index.name = 'temp'
     return pb_df
 
@@ -178,8 +194,16 @@ class rs_correlations(str,Enum):
     glaso = 'glaso'
     valarde = 'valarde'
     
-
-def rs(p=None, pb=None, temp=None, api=None, sg_gas=None, rsb=None, method='standing', **kwargs):
+@validate_arguments(config=dict(arbitrary_types_allowed=True))
+def rs(
+    pressure:Pressure=None, 
+    pb:Pressure=None, 
+    temperature:Temperature=None, 
+    api:Union[np.ndarray,float,List[float]]=None, 
+    sg_gas:Union[np.ndarray,float,List[float]]=None, 
+    rsb:Union[np.ndarray,float,List[float]]=None, 
+    method:Union[rs_correlations,List[rs_correlations]]=rs_correlations.standing,
+):
     """
     Estimate the Gas-Oil Ratio using Standing Correlation
 
@@ -199,33 +223,19 @@ def rs(p=None, pb=None, temp=None, api=None, sg_gas=None, rsb=None, method='stan
 
     Source: Correlaciones Numericas PVT - Carlos Banzer
     """
-    assert isinstance(p, (int, float, list, np.ndarray))
-    p = np.atleast_1d(p)
-
-    assert isinstance(pb, (int, float, list, np.ndarray))
-    pb = np.atleast_1d(pb)
-
-    assert isinstance(temp, (int, float, list, np.ndarray))
-    temp = np.atleast_1d(temp)
-
-    assert isinstance(api, (int, float, list, np.ndarray))
+    pb = np.atleast_1d(pb.convert_to('psi').value)
     api = np.atleast_1d(api)
-
-    assert isinstance(sg_gas, (int, float, list, np.ndarray))
     sg_gas = np.atleast_1d(sg_gas)
 
-    assert isinstance(rsb, (int, float, list, np.ndarray, type(None)))
-    rsb = np.atleast_1d(rsb)
-
-    assert isinstance(method, (str, list))
+    p = np.array(pressure.convert_to('psi').value)
 
     methods = []
 
-    if isinstance(method, str):
-        methods.append(method)
+    if isinstance(method, rs_correlations):
+        methods.append(method.value)
         multiple = False
     else:
-        methods.extend(method)
+        methods.extend([i.value for i in method])
         multiple = True
 
     rs_dict = {}
@@ -234,20 +244,20 @@ def rs(p=None, pb=None, temp=None, api=None, sg_gas=None, rsb=None, method='stan
     p_sat[p < pb] = p[p < pb]
 
     if 'standing' in methods:
-        rs = sg_gas * np.power(((p_sat / 18.2) + 1.4) * np.power(10, 0.0125 * api - 0.00091 * temp), 1.2048)
+        rs = sg_gas * np.power(((p_sat / 18.2) + 1.4) * np.power(10, 0.0125 * api - 0.00091 * temperature.convert_to('farenheit').value), 1.2048)
         rs_dict['rs_standing'] = rs
 
     if 'laster' in methods:
-        array_shape = p_sat * sg_gas * temp * p
+        array_shape = np.broadcast_shapes(p_sat.shape, sg_gas.shape , np.array(temperature.value).shape , p.shape)
         mo = np.zeros(api.shape)
         mo[api <= 40] = 630 - 10 * api[api <= 40]
         mo[api > 40] = 73110 * np.power(api[api > 40], -1.562)
 
-        pb_factor = (p_sat * sg_gas) / (temp + 459.67)
+        pb_factor = (p_sat * sg_gas) / temperature.convert_to('rankine').value
 
         # estimate yg
 
-        yg = np.zeros(array_shape.shape)
+        yg = np.zeros(array_shape)
 
         yg[pb_factor < 3.29] = 0.359 * np.log(1.473 * pb_factor[pb_factor < 3.29] + 0.476)
         yg[pb_factor >= 3.29] = np.power(0.121 * pb_factor[pb_factor >= 3.29] - 0.236, 0.281)
@@ -271,12 +281,12 @@ def rs(p=None, pb=None, temp=None, api=None, sg_gas=None, rsb=None, method='stan
         c3[api <= 30] = 25.724
         c3[api > 30] = 23.931
 
-        rs = c1 * sg_gas * np.power(p_sat, c2) * np.exp((c3 * api) / (temp + 460))
+        rs = c1 * sg_gas * np.power(p_sat, c2) * np.exp((c3 * api) / temperature.convert_to('rankine').value)
         rs_dict['rs_vazquez_begss'] = rs
 
     if 'glaso' in methods:
         f = np.power(10, 2.8869 - np.power(14.1811 - 3.3093 * np.log10(p_sat), 0.5))
-        rs = sg_gas * np.power(f * (np.power(api, 0.989) / np.power(temp, 0.172)), 1.2255)
+        rs = sg_gas * np.power(f * (np.power(api, 0.989) / np.power(temperature.convert_to('farenheit').value, 0.172)), 1.2255)
         rs_dict['rs_glaso'] = rs
 
     if 'valarde' in methods:
@@ -285,6 +295,8 @@ def rs(p=None, pb=None, temp=None, api=None, sg_gas=None, rsb=None, method='stan
         Pressures Below Bubble Point Pressure
         -A New Approach"""
         "https://wiki.pengtools.com/index.php?title=Velarde_correlation"
+        rsb = np.atleast_1d(rsb)
+        temp = temperature.convert_to('farenheit').value
         A0 = 9.73e-7
         A1 = 1.672608
         A2 = 0.929870
@@ -324,7 +336,17 @@ class bo_correlations(str,Enum):
     vazquez_beggs = 'vazquez_beggs'
     glaso = 'glaso'
 
-def bo(p=None, rs=None, pb=None, temp=None, api=None, sg_gas=None, method='standing', **kwargs):
+@validate_arguments(config=dict(arbitrary_types_allowed=True))
+def bo(
+    pressure:Pressure=None, 
+    rs:Union[np.ndarray,float,List[float]]=None, 
+    pb:Pressure=None, 
+    temperature:Temperature=None, 
+    api:Union[np.ndarray,float,List[float]]=None, 
+    sg_gas:Union[np.ndarray,float,List[float]]=None, 
+    co:Union[np.ndarray,float,List[float]]=0.0,
+    method:Union[bo_correlations,List[bo_correlations]]=bo_correlations.standing
+):
     """
     Estimate the Oil Volumetric Factor using Correlations
 
@@ -345,43 +367,30 @@ def bo(p=None, rs=None, pb=None, temp=None, api=None, sg_gas=None, method='stand
 
     Source: Correlaciones Numericas PVT - Carlos Banzer
     """
-    assert isinstance(p, (int, float, list, np.ndarray))
-    p = np.atleast_1d(p)
-
-    assert isinstance(rs, (int, float, list, np.ndarray))
+    p = np.atleast_1d(pressure.convert_to('psi').value)
     rs = np.atleast_1d(rs)
-
-    assert isinstance(pb, (int, float, list, np.ndarray))
-    pb = np.atleast_1d(pb)
-
-    assert isinstance(temp, (int, float, list, np.ndarray))
-    temp = np.atleast_1d(temp)
-
-    assert isinstance(api, (int, float, list, np.ndarray))
+    pb = np.atleast_1d(pb.convert_to('psi').value)
     api = np.atleast_1d(api)
-
-    assert isinstance(sg_gas, (int, float, list, np.ndarray))
     sg_gas = np.atleast_1d(sg_gas)
-
-    assert p.shape == rs.shape
+    co = np.atleast_1d(co)
 
     assert isinstance(method, (str, list))
 
     methods = []
-
-    if isinstance(method, str):
-        methods.append(method)
+    if isinstance(method, bo_correlations):
+        methods.append(method.value)
         multiple = False
     else:
-        methods.extend(method)
+        methods.extend([i.value for i in method])
         multiple = True
 
     bo_dict = {}
 
     if 'standing' in methods:
         sg_oil = api_to_sg(api)
-        f = rs * np.sqrt(sg_gas / sg_oil) + 1.25 * temp
+        f = rs * np.sqrt(sg_gas / sg_oil) + 1.25 * temperature.convert_to('farenheit').value
         bo = 0.9759 + 12e-5 * np.power(f, 1.2)
+        bo[p>pb] = bo[p>pb] * np.exp(co[p>pb] * (pb - p[p>pb]))
         bo_dict['bo_standing'] = bo
 
     if 'vazquez_beggs' in methods:
@@ -398,14 +407,17 @@ def bo(p=None, rs=None, pb=None, temp=None, api=None, sg_gas=None, method='stand
 
         c3[api <= 30] = -1.8106e-8
         c3[api > 30] = 1.3370e-9
-
+        temp = temperature.convert_to('farenheit').value
         bo = 1 + c1 * rs + c2 * (temp - 60) * (api / sg_gas) + c3 * rs * (temp - 60) * (api / sg_gas)
+        bo[p>pb] = bo[p>pb] * np.exp(co[p>pb] * (pb - p[p>pb]))
         bo_dict['bo_vazquez_beggs'] = bo
 
     if 'glaso' in methods:
+        temp = temperature.convert_to('farenheit').value
         sg_oil = api_to_sg(api)
         f = rs * np.power(sg_gas / sg_oil, 0.526) + 0.968 * temp
         bo = 1 + np.power(10, -6.58511 + 2.91329 * np.log10(f) - 0.27683 * np.power(np.log10(f), 2))
+        bo[p>pb] = bo[p>pb] * np.exp(co[p>pb] * (pb - p[p>pb]))
         bo_dict['bo_glaso'] = bo
 
     bo_df = pd.DataFrame(bo_dict, index=p) if multiple == True else pd.DataFrame({'bo': bo}, index=p)
@@ -422,9 +434,18 @@ class co_above_correlations(str,Enum):
 
 class co_below_correlations(str,Enum):
     mccain = 'mccain'
-    
-def co(p=None, rs=None, pb=None, temp=None, sg_gas=None, api=None, bo=None,
-       method_above_pb='vazquez_beggs', method_below_pb='mccain', **kwargs):
+
+@validate_arguments(config=dict(arbitrary_types_allowed=True))
+def co(
+    pressure:Pressure=None, 
+    rs:Union[np.ndarray,float,List[float]]=None, 
+    pb:Pressure=None, 
+    temperature:Temperature=None, 
+    sg_gas:Union[np.ndarray,float,List[float]]=None, 
+    api:Union[np.ndarray,float,List[float]]=None, 
+    method_above_pb:co_above_correlations=co_above_correlations.vazquez_beggs, 
+    method_below_pb:co_below_correlations=co_below_correlations.mccain
+):
     """
     Estimate the Oil compresibility in 1/psi
 
@@ -446,37 +467,18 @@ def co(p=None, rs=None, pb=None, temp=None, sg_gas=None, api=None, bo=None,
 
     Source: Correlaciones Numericas PVT - Carlos Banzer
     """
-    assert isinstance(p, (int, float, list, np.ndarray))
-    p = np.atleast_1d(p)
-
-    assert isinstance(rs, (int, float, list, np.ndarray))
+    p = np.atleast_1d(pressure.convert_to('psi').value)
     rs = np.atleast_1d(rs)
-
-    assert isinstance(pb, (int, float, list, np.ndarray))
-    pb = np.atleast_1d(pb)
-
-    assert isinstance(temp, (int, float, list, np.ndarray))
-    temp = np.atleast_1d(temp)
-
-    assert isinstance(sg_gas, (int, float, list, np.ndarray))
+    pb = np.atleast_1d(pb.convert_to('psi').value)
     sg_gas = np.atleast_1d(sg_gas)
-
-    assert isinstance(api, (int, float, list, np.ndarray))
     api = np.atleast_1d(api)
-
-    assert isinstance(pb, (int, float, list, np.ndarray))
-    bo = np.atleast_1d(bo)
 
     #assert isinstance(pb, (int, float, list, np.ndarray))
     #bg = np.atleast_1d(bg)
 
-    assert p.shape == bo.shape == rs.shape == bo.shape #== bg.shape
-
-    rs_int = interp1d(p, rs)
-    rsb = rs_int(pb)
-
     co = np.zeros(p.shape)
 
+    temp = temperature.convert_to('farenheit').value
     if 'vazquez_beggs' == method_above_pb:
         co[p >= pb] = (-1433 + 5 * rs[p >= pb] + 17.2 * temp - 1180 * sg_gas + 12.61 * api) / (
                     p[p >= pb] * np.power(10, 5))
@@ -491,6 +493,7 @@ def co(p=None, rs=None, pb=None, temp=None, sg_gas=None, api=None, bo=None,
         raise ValueError('no method set')
 
     if 'mccain' == method_below_pb:
+        rsb = rs[p >= pb].mean()
         co[p < pb] = 5.1414768e-4 * np.power(p[p < pb], -1.450) * np.power(pb, -0.383) * np.power(temp,1.402) * np.power(api,0.256) * np.power(rsb, 0.449)
 
     else:
@@ -503,12 +506,17 @@ def co(p=None, rs=None, pb=None, temp=None, sg_gas=None, api=None, bo=None,
 class muod_correlations(str,Enum):
     beal = 'beal'
     beggs = 'beggs'
-    glasso = 'glasso'
+    glaso = 'glaso'
 
 
 #####################################################################################
 # Dead Oil Viscosity
-def muod(temp=None, api=None, method='beal', **kwargs):
+@validate_arguments(config=dict(arbitrary_types_allowed=True))
+def muod(
+    temperature:Temperature=None, 
+    api:Union[np.ndarray,float,List[float]]=None, 
+    method:Union[muod_correlations,List[muod_correlations]]=muod_correlations.beal
+):
     """
     Estimate the Dead Oil Viscosity
 
@@ -522,31 +530,26 @@ def muod(temp=None, api=None, method='beal', **kwargs):
 
     Source: Correlaciones Numericas PVT - Carlos Banzer
     """
-    assert isinstance(temp, (int, float, list, np.ndarray))
-    temp = np.atleast_1d(temp)
-
-    assert isinstance(api, (int, float, list, np.ndarray))
     api = np.atleast_1d(api)
 
-    assert isinstance(method, (list,str))
-
     methods = []
-
-    if isinstance(method, str):
-        methods.append(method)
+    if isinstance(method, muod_correlations):
+        methods.append(method.value)
         multiple = False
     else:
-        methods.extend(method)
+        methods.extend([i.value for i in method])
         multiple = True
 
     muod_dict = {}
 
     if 'beal' in methods:
+        temp = np.atleast_1d(temperature.convert_to('farenheit').value)
         a = np.power(10, 0.43 + (8.33 / api))
         muod = (0.32 + (1.8e7 / np.power(api, 4.53))) * np.power(360 / (temp + 200), a)
         muod_dict['muod_beal'] = muod
 
     if 'beggs' in methods:
+        temp = np.atleast_1d(temperature.convert_to('farenheit').value)
         z = 3.0324 - 0.02023 * api
         y = np.power(10, z)
         x = y * np.power(temp, -1.163)
@@ -555,6 +558,7 @@ def muod(temp=None, api=None, method='beal', **kwargs):
         muod_dict['muod_beggs'] = muod
 
     if 'glaso' in methods:
+        temp = np.atleast_1d(temperature.convert_to('farenheit').value)
         muod = 3.141e10 * np.power(temp, -3.444) * np.power(np.log10(api), 10.313 * np.log10(temp) - 36.447)
         muod_dict['muod_glaso'] = muod
 
@@ -576,9 +580,18 @@ class muo_above_correlations(str,Enum):
     vazquez_beggs = 'vazquez_beggs'
     kartoatmodjo = 'kartoatmodjo'
 
-
-def muo(p=None, rs=None, pb=None, temp=None, api=None,
-        method_below_pb='beggs', method_above_pb='vazquez_beggs', method_dead='beal', **kwargs):
+@validate_arguments(config=dict(arbitrary_types_allowed=True))
+def muo(
+    pressure:Pressure=None, 
+    rs:Union[np.ndarray,float,List[float]]=None, 
+    pb:Pressure=None, 
+    rsb:Union[np.ndarray,float,List[float]]=None,
+    temperature:Temperature=None, 
+    api:Union[np.ndarray,float,List[float]]=None,
+    method_below_pb:muo_below_correlations='beggs', 
+    method_above_pb:muo_above_correlations='vazquez_beggs', 
+    method_dead:muod_correlations='beal'
+):
     """
     Estimate the live Oil Viscosity
 
@@ -599,32 +612,18 @@ def muo(p=None, rs=None, pb=None, temp=None, api=None,
 
     Source: Correlaciones Numericas PVT - Carlos Banzer
     """
-    assert isinstance(p, (int, float, list, np.ndarray))
-    p = np.atleast_1d(p)
-
-    assert isinstance(temp, (int, float, list, np.ndarray))
-    temp = np.atleast_1d(temp)
-
-    assert isinstance(rs, (int, float, list, np.ndarray))
+    p = np.atleast_1d(pressure.convert_to('psi').value)
     rs = np.atleast_1d(rs)
-
-    assert isinstance(pb, (int, float, list, np.ndarray))
-    pb = np.atleast_1d(pb)
-
-    assert isinstance(api, (int, float, list, np.ndarray))
+    rsb = np.atleast_1d(rsb)
+    pb = np.atleast_1d(pb.convert_to('psi').value)
     api = np.atleast_1d(api)
 
-    assert p.shape == rs.shape, f'Not equal shape: {p.shape} != {rs.shape}'
-
     # Estimate the Dead oil Viscosity
-    _muod = muod(temp=temp, api=api, methods=method_dead)
+    _muod = muod(temperature=temperature, api=api, method=method_dead)
     _muod = _muod['muod'].values
 
     muo = np.zeros(p.shape)
     muob = np.zeros(1)
-
-    rs_int = interp1d(p, rs)
-    rsb = rs_int(pb)
 
     if 'chew' == method_below_pb:
         a = np.power(10, rs[p <= pb] * (2.2e-7 * rs[p <= pb] - 7.4e-4))
@@ -677,8 +676,18 @@ def muo(p=None, rs=None, pb=None, temp=None, api=None,
 class rho_correlations(str,Enum):
     banzer = 'banzer'
 
-
-def rho_oil(p=None, co=None, bo=None, rs=None, api=None, pb=None, method='banzer', **kwargs):
+@validate_arguments(config=dict(arbitrary_types_allowed=True))
+def rho_oil(
+    pressure:Pressure=None, 
+    co:Union[np.ndarray,float,List[float]]=None, 
+    bo:Union[np.ndarray,float,List[float]]=None, 
+    bob:Union[np.ndarray,float,List[float]]=None,
+    rs:Union[np.ndarray,float,List[float]]=None, 
+    rsb:Union[np.ndarray,float,List[float]]=None,
+    api:Union[np.ndarray,float,List[float]]=None, 
+    pb:Pressure=None, 
+    method:Union[rho_correlations,List[rho_correlations]]=rho_correlations.banzer
+):
     """
     Estimate the Oil Density in lb/ft3
 
@@ -696,35 +705,20 @@ def rho_oil(p=None, co=None, bo=None, rs=None, api=None, pb=None, method='banzer
 
     Source: Correlaciones Numericas PVT - Carlos Banzer
     """
-    assert isinstance(p, (int, float, list, np.ndarray))
-    p = np.atleast_1d(p)
-
-    assert isinstance(co, (int, float, list, np.ndarray))
+    p = np.atleast_1d(pressure.convert_to('psi').value)
     co = np.atleast_1d(co)
-
-    assert isinstance(bo, (int, float, list, np.ndarray))
     bo = np.atleast_1d(bo)
-
-    assert isinstance(rs, (int, float, list, np.ndarray))
     rs = np.atleast_1d(rs)
-
-    assert isinstance(api, (int, float, list, np.ndarray))
     api = np.atleast_1d(api)
-
-    assert isinstance(pb, (int, float, list, np.ndarray))
-    pb = np.atleast_1d(pb)
-
-    assert p.shape == bo.shape == rs.shape == co.shape
-
-    assert isinstance(method, (str, list))
+    pb = np.atleast_1d(pb.convert_to('psi').value)
+    rsb = np.atleast_1d(rsb)
 
     methods = []
-
-    if isinstance(method, str):
-        methods.append(method)
+    if isinstance(method, rho_correlations):
+        methods.append(method.value)
         multiple = False
     else:
-        methods.extend(method)
+        methods.extend([i.value for i in method])
         multiple = True
 
     rho_oil_dict = {}
@@ -741,10 +735,7 @@ def rho_oil(p=None, co=None, bo=None, rs=None, api=None, pb=None, method='banzer
         sg_oil = api_to_sg(api)
         rho_oil[p <= pb] = (350 * sg_oil + 0.0764 * ygd[p <= pb] * rs[p <= pb]) / (5.615 * bo[p <= pb])
 
-        rs_int = interp1d(p, rs)
-        bo_int = interp1d(p, bo)
-
-        rho_ob = (350 * sg_oil + 0.0764 * ygd[p > pb] * rs_int(pb)) / (5.615 * bo_int(pb))
+        rho_ob = (350 * sg_oil + 0.0764 * ygd[p > pb] * rsb) / (5.615 * bob)
         rho_oil[p > pb] = rho_ob * np.exp(co[p > pb] * (pb - p[p > pb]))
         rho_oil_dict['rho_banzer'] = rho_oil
 
@@ -760,7 +751,6 @@ def rho_oil(p=None, co=None, bo=None, rs=None, api=None, pb=None, method='banzer
 class rsw_correlations(str,Enum):
     culberson = 'culberson'
     mccoy = 'mccoy'
-
 
 
 def rsw(p=None, t=None, s=None, method='culberson'):
@@ -1213,7 +1203,7 @@ def z_factor(p=None, t=None, ppc=None, tpc=None, method='papay'):
     t = np.atleast_1d(t) + 460 # temp to R
 
     assert isinstance(ppc, (int, float, list, np.ndarray))
-    ppc = np.atleast_1d(ppc) + 460 # temp to R
+    ppc = np.atleast_1d(ppc) # temp to R
 
     assert isinstance(tpc, (int, float, list, np.ndarray))
     tpc = np.atleast_1d(tpc) + 460 # temp to R
@@ -1439,8 +1429,13 @@ def critical_properties_correction(ppc=None, tpc=None, h2s=0,co2=0, n2=0, method
     
     else:
         raise ValueError('No method matched')
+    
+    cp = CriticalProperties(
+        critical_pressure = Pressure(value = ppc_c, unit = 'psi'),
+        critical_temperature = Temperature(value = tpc_c, unit = 'rankine')
+    )
 
-    return {'ppc':ppc_c,'tpc':tpc_c}
+    return cp
 
 class mug_correlations(str,Enum):
     lee_gonzalez = 'lee_gonzalez'

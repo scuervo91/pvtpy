@@ -1,6 +1,6 @@
 [tool.poetry]
 name = "pvtpy"
-version = "0.1.0"
+version = "0.1.1"
 description = "Oil&Gas PVT Tool"
 authors = ["scuervo <scuervo91@gmail.com>"]
 license = "MIT"

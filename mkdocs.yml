@@ -35,6 +35,7 @@ nav:
         - Redlich Kwong: examples/4-Eos/2a-redlich_kwong_mixtures.ipynb
         - Soave Redlich Kwong: examples/4-Eos/3a-soave_redlich_kwong_mixtures.ipynb
         - Peng Robinson: examples/4-Eos/4a-peng_robinson_mixtures.ipynb
+  - Release Notes: release_notes.md
 
 repo_url: https://github.com/scuervo91/pvtpy
 repo_name: scuervo91/pvtpy

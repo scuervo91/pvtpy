@@ -90,18 +90,23 @@ class Chromatography(BaseModel):
             _co2 = df.loc['carbon-dioxide', 'mole_fraction'] if 'carbon-dioxide' in df.index.tolist() else 0
             _n2 = df.loc['nitrogen', 'mole_fraction'] if 'nitrogen' in df.index.tolist() else 0
             _h2s = df.loc['hydrogen-sulfide', 'mole_fraction'] if 'hydrogen-sulfide' in df.index.tolist() else 0
-            cp_correction = cor.critical_properties_correction(ppc=_ppc, tpc=_tpc, co2=_co2, n2=_n2, h2s=_h2s, method=correct_method)
+            cp = cor.critical_properties_correction(ppc=_ppc, tpc=_tpc, co2=_co2, n2=_n2, h2s=_h2s, method=correct_method)
         else:
-            cp_correction = {
+            cp_dict = {
                 'critical_pressure':Pressure(value = _ppc, unit=pressure_unit),
                 'critical_temperature': Temperature(value=_tpc, unit=temperature_unit)
             }
-
-        return CriticalProperties(**cp_correction)
+            cp = CriticalProperties(**cp_dict)
+        return cp
     
     def get_z(self,pressure=14.7,temperature=60, z_method='papay', cp_correction_method='wichert_aziz', normalize=True):
         cp = self.get_pseudo_critical_properties(correct=True, correct_method=cp_correction_method,normalize=normalize)
-        return cor.z_factor(p=pressure,t=temperature, ppc = cp.ppc, tpc = cp.tpc, method=z_method)
+        return cor.z_factor(
+            p=pressure,
+            t=temperature, 
+            ppc = cp.critical_pressure.value, 
+            tpc = cp.critical_temperature.value, 
+            method=z_method)
 
     def get_rhog(self,pressure=14.7,temperature=60, z_method='papay',rhog_method='real_gas',normalize=True):
         _ma = self.apparent_molecular_weight(normalize=normalize)

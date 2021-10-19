@@ -45,12 +45,13 @@ def pressure_converter(value:float, From:str,To:str)->float:
     return pressure_converter_matrix.loc[From,To]*value
     
 class Pressure(BaseModel):
-    value: Union[float, List[float]]
+    value: Union[float, List[float], np.ndarray]
     unit: PressureUnits = Field(PressureUnits.psi)
     
     class Config:
         extra = 'forbid'
         validate_assigment = True
+        arbitrary_types_allowed=True
         
     def convert_to(self, unit:PressureUnits):
         old_value = np.atleast_1d(self.value)
@@ -60,12 +61,13 @@ class Pressure(BaseModel):
         return Pressure(value=new_value.tolist(), unit=unit)
     
 class Temperature(BaseModel):
-    value: Union[float, List[float]]
+    value: Union[float, List[float], np.ndarray]
     unit: TemperatureUnits = Field(TemperatureUnits.farenheit)
     
     class Config:
         extra = 'forbid'
         validate_assigment = True
+        arbitrary_types_allowed=True
         
     def convert_to(self, unit:TemperatureUnits):
         old_value = np.atleast_1d(self.value)

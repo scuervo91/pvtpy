@@ -1,6 +1,7 @@
 from pydantic import Field
 import numpy as np
 import pandas as pd
+from scipy.interpolate import interp1d
 from ..pvt import PVT
 from .base import FluidBase
 from ..black_oil import correlations as cor 
@@ -14,7 +15,7 @@ from ..units import Pressure
 class Oil(FluidBase):
     api: float = Field(...,gt=0)
     sulphur: float = Field(None, gt=0)
-    pb: float = Field(None, gt=0)
+    pb: Pressure = Field(None)
     rsb: float = Field(None, gt=0)
     sg_gas: float = Field(None, gt=0)
     
@@ -37,71 +38,79 @@ class Oil(FluidBase):
         elif self.pb is None:
             pb = cor.pb(
                 rs=self.rsb,
-                temp=self.initial_conditions.temperature.value,
+                temperature=self.initial_conditions.temperature,
                 sg_gas=self.sg_gas,
                 api=self.api,
-                methods=correlations.pb.value, correction=True)['pb'].values
-            self.pb = pb
+                method=correlations.pb.value, correction=True)['pb'].values
+            self.pb = Pressure(value=pb, unit='psi')
             
             rs_cor = cor.rs(
-                p = p_range,
-                pb = pb,
-                temp = self.initial_conditions.temperature.value,
+                pressure = Pressure(value = p_range,unit='psi'),
+                pb = self.pb,
+                temperature = self.initial_conditions.temperature,
                 sg_gas=self.sg_gas,
                 api=self.api,
-                methods = 'valarde'
+                rsb = self.rsb,
+                method = 'valarde'
             )
         else:
             rs_cor = cor.rs(
-                p = p_range,
+                pressure = Pressure(value = p_range,unit='psi'),
                 pb = self.pb,
-                temp = self.initial_conditions.temperature.value,
+                temp = self.initial_conditions.temperature,
                 sg_gas=self.sg_gas,
                 api=self.api,
-                methods = correlations.rs.value
+                method = correlations.rs.value
             )
             
-        bo_cor = cor.bo(
-            p = p_range,
-            rs = rs_cor['rs'].values,
-            pb = self.pb,
-            temp = self.initial_conditions.temperature.value,
-            sg_gas=self.sg_gas,
-            api=self.api,
-            methods = correlations.bo.value
-        )
-        
+            self.rsb = interp1d(p_range, rs_cor['rs'].values)(self.pb)
+
         co_cor = cor.co(
-            p = p_range,
+            pressure = Pressure(value = p_range,unit='psi'),
             rs = rs_cor['rs'].values,
             pb = self.pb,
-            temp = self.initial_conditions.temperature.value,
+            temperature = self.initial_conditions.temperature,
             sg_gas=self.sg_gas,
             api=self.api,
-            bo=bo_cor['bo'].values,
             method_above_pb = correlations.co_above.value,
             method_below_pb = correlations.co_below.value             
         )
         
-        muo_cor = cor.muo(
-            p = p_range,
+        bo_cor = cor.bo(
+            pressure = Pressure(value = p_range,unit='psi'),
             rs = rs_cor['rs'].values,
             pb = self.pb,
-            temp = self.initial_conditions.temperature.value,
+            temperature = self.initial_conditions.temperature,
+            sg_gas=self.sg_gas,
             api=self.api,
+            co = co_cor['co'].values,
+            method = correlations.bo.value
+        )
+        
+        bob = interp1d(p_range, bo_cor['bo'].values)(self.pb.value)
+                
+        muo_cor = cor.muo(
+            pressure = Pressure(value = p_range,unit='psi'),
+            rs = rs_cor['rs'].values,
+            pb = self.pb,
+            temperature = self.initial_conditions.temperature,
+            api = self.api,
+            rsb = self.rsb,
             method_above_pb = correlations.muo_above.value,
             method_below_pb = correlations.muo_below.value,
             method_dead = correlations.muod.value
         )
         
         rho_cor = cor.rho_oil(
-            p=p_range,
+            pressure = Pressure(value = p_range,unit='psi'),
             co=co_cor['co'].values,
             bo=bo_cor['bo'].values,
             rs=rs_cor['rs'].values,
+            bob=bob,
             api=self.api,
             pb=self.pb,
-            methods = correlations.muod.value
+            rsb=self.rsb,
+            method = correlations.rho.value
         )
         
         #_pvt = pd.concat([rs_cor,bo_cor,co_cor,muo_cor,rho_cor],axis=1)
@@ -144,15 +153,15 @@ class Oil(FluidBase):
                 min_pressure = np.min(self.pvt.pressure.value)
             if max_pressure is None:
                 max_pressure = np.max(self.pvt.pressure.value)
-            if min_pressure >= self.pb:
+            if min_pressure >= self.pb.value:
                 pressure = np.linspace(min_pressure,max_pressure,n_sat)
                 flag = 'unsat'
-            elif max_pressure <= self.pb:
+            elif max_pressure <= self.pb.value:
                 pressure = np.linspace(min_pressure,max_pressure,n_sat)
                 flag = 'sat'
             else:
-                sat_pressure = np.linspace(min_pressure,self.pb,n_sat)
-                unsat_pressure = np.linspace(self.pb,max_pressure, n_unsat+1)
+                sat_pressure = np.linspace(min_pressure,self.pb.value,n_sat)
+                unsat_pressure = np.linspace(self.pb.value,max_pressure, n_unsat+1)
                 pressure = np.concatenate((sat_pressure,unsat_pressure[1:]))
                 flag = 'mixed'
                 
@@ -173,14 +182,14 @@ class Oil(FluidBase):
         else:
             
             #Print Saturated data
-            for i,r in pvt_df[pvt_df['pressure']<self.pb].iterrows():
+            for i,r in pvt_df[pvt_df['pressure']<self.pb.value].iterrows():
                 string += pvt_df.loc[[i],['rs','pressure','bo','muo']].to_string(index=False, header=False,float_format=float_format) + '/\n'  
                     
             #Print data at bubble point
-            string += pvt_df.loc[pvt_df['pressure']==self.pb,['rs','pressure','bo','muo']].to_string(index=False, header=False,float_format=float_format) + '\n'  
+            string += pvt_df.loc[pvt_df['pressure']==self.pb.value,['rs','pressure','bo','muo']].to_string(index=False, header=False,float_format=float_format) + '\n'  
             
             string += '-- Unsaturated Data\n'
-            string += pvt_df.loc[pvt_df['pressure']>self.pb,['pressure','bo','muo']].to_string(index=False, header=False,float_format=float_format)
+            string += pvt_df.loc[pvt_df['pressure']>self.pb.value,['pressure','bo','muo']].to_string(index=False, header=False,float_format=float_format)
             string += '/\n/'
         
         return string
