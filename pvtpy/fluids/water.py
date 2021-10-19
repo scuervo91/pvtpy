@@ -4,12 +4,12 @@ import pandas as pd
 from ..pvt import PVT
 from .base import FluidBase
 from ..black_oil import correlations as cor 
-from ..units import Pressure
+from ..units import Pressure, Temperature
 
 
 class Water(FluidBase):
     salinity: float = Field(..., gt=0)
-    pb: float = Field(None,gt=0)
+    pb: Pressure = Field(None)
     
     class Config:
         extra = 'ignore'
@@ -23,19 +23,46 @@ class Water(FluidBase):
         correlations = cor.SetWaterCorrelations()
     ):
 
-        p_range=np.linspace(start_pressure,end_pressure,n)
+        p_range=Pressure(value=np.linspace(start_pressure,end_pressure,n).tolist(), unit='psi')
 
 
-        rsw_cor = cor.rsw(p=p_range, t=self.initial_conditions.temperature.value, s=self.salinity, method=correlations.rsw)
-        cw_cor = cor.cw(p=p_range, t=self.initial_conditions.temperature.value, rsw=rsw_cor['rsw'].values, s=self.salinity, method=correlations.cw)
-        bw_cor = cor.bw(p=p_range, t=self.initial_conditions.temperature.value, pb=self.pb, cw=cw_cor['cw'].values, s=self.salinity, method=correlations.bw)
-        rhow_cor = cor.rhow(p=p_range,s=self.salinity, bw=bw_cor['bw'].values, method = correlations.rhow)
-        muw_cor = cor.muw(p=p_range, t=self.initial_conditions.temperature.value, s = self.salinity,  method = correlations.muw)
+        rsw_cor = cor.rsw(
+            pressure=p_range, 
+            temperature=self.initial_conditions.temperature, 
+            salinity=self.salinity, 
+            method=correlations.rsw
+        )
+        cw_cor = cor.cw(
+            pressure=p_range, 
+            temperature=self.initial_conditions.temperature, 
+            rsw=rsw_cor['rsw'].values, 
+            salinity=self.salinity, 
+            method=correlations.cw
+        )
+        bw_cor = cor.bw(
+            pressure=p_range, 
+            temperature=self.initial_conditions.temperature, 
+            pb=self.pb, 
+            cw=cw_cor['cw'].values, 
+            salinity=self.salinity, 
+            method=correlations.bw
+        )
+        rhow_cor = cor.rhow(
+            pressure=p_range,
+            salinity=self.salinity, 
+            bw=bw_cor['bw'].values, 
+            method = correlations.rhow
+            )
+        muw_cor = cor.muw(
+            pressure=p_range, 
+            temperature=self.initial_conditions.temperature, 
+            salinity = self.salinity,  
+            method = correlations.muw
+        )
 
         _pvt = pd.concat([rsw_cor,cw_cor,bw_cor,muw_cor,rhow_cor],axis=1)
-
         _pvt = PVT(
-            pressure= Pressure(value=p_range.tolist()),
+            pressure= p_range,
             fields={
                 'rs':rsw_cor['rsw'].values.tolist(),
                 'cw':cw_cor['cw'].values.tolist(),
@@ -71,10 +98,10 @@ class Water(FluidBase):
         
         if pressure is None:
             if min_pressure is None:
-                min_pressure = np.min(self.pvt.pressure)
+                min_pressure = np.min(self.pvt.pressure.value)
             
             if max_pressure is None:
-                max_pressure = np.max(self.pvt.pressure)
+                max_pressure = np.max(self.pvt.pressure.value)
                 
             pressure = np.linspace(min_pressure,max_pressure,n)
             
@@ -82,6 +109,6 @@ class Water(FluidBase):
         
         
         # Write the string
-        string += pvt_df[['pressure','bg','mug']].to_string(header=False, index=False,float_format=float_format) +'/\n'
+        string += pvt_df[properties].to_string(header=False, index=False,float_format=float_format) +'/\n'
                    
         return string 

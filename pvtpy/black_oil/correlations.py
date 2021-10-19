@@ -752,8 +752,13 @@ class rsw_correlations(str,Enum):
     culberson = 'culberson'
     mccoy = 'mccoy'
 
-
-def rsw(p=None, t=None, s=None, method='culberson'):
+@validate_arguments(config=dict(arbitrary_types_allowed=True))
+def rsw(
+    pressure:Pressure=None, 
+    temperature:Temperature=None, 
+    salinity:Union[np.ndarray,float,List[float]]=None, 
+    method:Union[rsw_correlations,List[rsw_correlations]]=rsw_correlations.culberson
+):
     """
     Estimate Water Gas solubility is 
 
@@ -768,21 +773,17 @@ def rsw(p=None, t=None, s=None, method='culberson'):
 
     Source: Correlaciones Numericas PVT - Carlos Banzer
     """
-    assert isinstance(p, (int, float, list, np.ndarray))
-    p = np.atleast_1d(p)
-
-    assert isinstance(t, (int, float, list, np.ndarray))
-    t = np.atleast_1d(t)
+    p = np.atleast_1d(pressure.convert_to('psi').value)
+    t = np.atleast_1d(temperature.convert_to('farenheit').value)
 
     assert isinstance(method, (str, list))
 
     methods = []
-
-    if isinstance(method, str):
-        methods.append(method)
+    if isinstance(method, rsw_correlations):
+        methods.append(method.value)
         multiple = False
     else:
-        methods.extend(method)
+        methods.extend([i.value for i in method])
         multiple = True
 
     rsw_dict = {}
@@ -796,7 +797,7 @@ def rsw(p=None, t=None, s=None, method='culberson'):
         rswp = a + b * p + c * np.power(p, 2)
 
         # Convert p in ppm to percentage %
-        per_s = s / 1e4
+        per_s = salinity / 1e4
         correction = np.power(10, -0.0840655 * per_s * np.power(t, -0.285854))
         rsw = rswp * correction
         rsw_dict['rws_culberson'] = rsw
@@ -807,7 +808,7 @@ def rsw(p=None, t=None, s=None, method='culberson'):
         c = -8.75e-7 + 3.9e-9 * t - 1.02e-11 * np.power(t, 2)
         rswp = a + b * p + c * np.power(p, 2)
         # Convert p in ppm to percentage %
-        per_s = s / 1e4
+        per_s = salinity / 1e4
         correction = (1 - (0.0753 - 1.73e-4 * t) * per_s)
         rsw = rswp * correction
         rsw_dict['rsw_mccoy'] = rsw
@@ -820,7 +821,15 @@ class bw_correlations(str,Enum):
     mccain = 'mccain'
     mccoy = 'mccoy'
 
-def bw(p=None, t=None, pb=0, cw=0, s=None, method='mccain'):
+@validate_arguments(config=dict(arbitrary_types_allowed=True))
+def bw(
+    pressure:Pressure=None, 
+    temperature:Temperature=None, 
+    pb:Pressure=Pressure(value=14.7, unit='psi'), 
+    cw:Union[np.ndarray,float,List[float]]=0, 
+    salinity:Union[np.ndarray,float,List[float]]=None, 
+    method:Union[bw_correlations,List[bw_correlations]]=bw_correlations.mccain
+):
     """
     Estimate Water volumetric factor
 
@@ -838,31 +847,22 @@ def bw(p=None, t=None, pb=0, cw=0, s=None, method='mccain'):
 
     Source: Correlaciones Numericas PVT - Carlos Banzer
     """
-    assert isinstance(p, (int, float, list, np.ndarray))
-    p = np.atleast_1d(p)
-
-    assert isinstance(t, (int, float, list, np.ndarray))
-    t = np.atleast_1d(t)
-
-    assert isinstance(pb, (int, float, list, np.ndarray))
-    pb = np.atleast_1d(pb)
-
-    assert isinstance(cw, (int, float, list, np.ndarray))
+    p = np.atleast_1d(pressure.convert_to('psi').value)
+    t = np.atleast_1d(temperature.convert_to('farenheit').value)
+    pb = np.atleast_1d(pb.convert_to('psi').value)
     cw = np.atleast_1d(cw)
-
-    assert isinstance(s, (int, float, list, np.ndarray))
-    s = np.atleast_1d(s)
+    salinity = np.atleast_1d(salinity)
 
     assert isinstance(method, (str, list))
 
     methods = []
-
-    if isinstance(method, str):
-        methods.append(method)
+    if isinstance(method, bw_correlations):
+        methods.append(method.value)
         multiple = False
     else:
-        methods.extend(method)
+        methods.extend([i.value for i in method])
         multiple = True
+        
     bw_dict = {}
 
     if 'mccain' in methods:
@@ -882,7 +882,7 @@ def bw(p=None, t=None, pb=0, cw=0, s=None, method='mccain'):
         bwp[p > pb] = bwb * np.exp(cw[p > pb] * (pb - p[p > pb]))
 
         # Convert p in ppm to percentage %
-        per_s = s / 1e4
+        per_s = salinity / 1e4
         correction = 1 + per_s * (
                     5.1e-8 * p + (5.47e-6 - 1.95e-10 * p) * (t - 60) - (3.23e-8 - 8.5e-13 * p) * (np.power(t - 60, 2)))
         bw = bwp * correction
@@ -902,7 +902,7 @@ def bw(p=None, t=None, pb=0, cw=0, s=None, method='mccain'):
         bwp[p > pb] = bwb = np.exp(cw[p > pb] * (pb - p[p > pb]))
 
         # Convert p in ppm to percentage %
-        per_s = s / 1e4
+        per_s = salinity / 1e4
         correction = 1 + per_s * (
                     5.1e-8 * p + (5.47e-6 - 1.95e-10 * p) * (t - 60) - (3.23e-8 - 8.5e-13 * p) * (np.power(t - 60, 2)))
         bw = bwp * correction
@@ -916,7 +916,14 @@ class cw_correlations(str,Enum):
     standing = 'standing'
     osif = 'osif'
 
-def cw(p=None, t=None, rsw=0, s=0, method='standing'):  # Note: Pending develop cw pressure < pb
+@validate_arguments(config=dict(arbitrary_types_allowed=True))
+def cw(
+    pressure:Pressure=None, 
+    temperature:Temperature=None, 
+    rsw:Union[np.ndarray,float,List[float]]=0, 
+    salinity:Union[np.ndarray,float,List[float]]=0, 
+    method:Union[cw_correlations,List[cw_correlations]]=cw_correlations.standing
+):  # Note: Pending develop cw pressure < pb
     """
     Estimate Water compressibility
 
@@ -933,27 +940,19 @@ def cw(p=None, t=None, rsw=0, s=0, method='standing'):  # Note: Pending develop 
 
     Source: Correlaciones Numericas PVT - Carlos Banzer
     """
-    assert isinstance(p, (int, float, list, np.ndarray))
-    p = np.atleast_1d(p)
-
-    assert isinstance(t, (int, float, list, np.ndarray))
-    t = np.atleast_1d(t)
-
-    assert isinstance(rsw, (int, float, list, np.ndarray))
+    p = np.atleast_1d(pressure.convert_to('psi').value)
+    t = np.atleast_1d(temperature.convert_to('farenheit').value)
     rsw = np.atleast_1d(rsw)
-
-    assert isinstance(s, (int, float, list, np.ndarray))
-    s = np.atleast_1d(s)
+    salinity = np.atleast_1d(salinity)
 
     assert isinstance(method, (str, list))
 
     methods = []
-
-    if isinstance(method, str):
-        methods.append(method)
+    if isinstance(method, cw_correlations):
+        methods.append(method.value)
         multiple = False
     else:
-        methods.extend(method)
+        methods.extend([i.value for i in method])
         multiple = True
 
     cw_dict = {}
@@ -968,7 +967,7 @@ def cw(p=None, t=None, rsw=0, s=0, method='standing'):  # Note: Pending develop 
         correction_rsw = 1 + 8.9e-3 * rsw
 
         # Convert p in ppm to percentage %
-        per_s = s / 1e4
+        per_s = salinity / 1e4
         correction_s = 1 + np.power(per_s, 0.7) * (
                     -5.2e-2 + 2.7e-4 * t - 1.14e-6 * np.power(t, 2) + 1.121e-9 * np.power(t, 3))
 
@@ -977,7 +976,7 @@ def cw(p=None, t=None, rsw=0, s=0, method='standing'):  # Note: Pending develop 
         cw_dict['cw_standing'] = cw
 
     if 'osif' in methods:
-        per_s = s / 1e4
+        per_s = salinity / 1e4
         cw = 1 / (7.033 * p + 541.5 * per_s - 537 * t + 403300)
         cw_dict['cw_osif'] = cw
 
@@ -990,8 +989,14 @@ class muw_correlations(str,Enum):
     russel = 'russel'
     meehan = 'meehan'
     brill_beggs = 'brill_beggs'
-    
-def muw(p=None, t=None, s = 0,  method = 'van_wingen'):
+
+@validate_arguments(config=dict(arbitrary_types_allowed=True))
+def muw(
+    pressure:Pressure=None, 
+    temperature:Temperature=None, 
+    salinity:Union[np.ndarray,float,List[float]] = 0,  
+    method:Union[muw_correlations,List[muw_correlations]]=muw_correlations.van_wingen
+):
     """
     Estimate Water Viscosity
 
@@ -1006,24 +1011,16 @@ def muw(p=None, t=None, s = 0,  method = 'van_wingen'):
 
     Source: Correlaciones Numericas PVT - Carlos Banzer
     """
-    assert isinstance(p, (int, float, list, np.ndarray))
-    p = np.atleast_1d(p)
-
-    assert isinstance(t, (int, float, list, np.ndarray))
-    t = np.atleast_1d(t)
-
-    assert isinstance(s, (int, float, list, np.ndarray))
-    s = np.atleast_1d(s)
-
-    assert isinstance(method, (str, list))
+    p = np.atleast_1d(pressure.convert_to('psi').value)
+    t = np.atleast_1d(temperature.convert_to('farenheit').value)
+    salinity = np.atleast_1d(salinity)
 
     methods = []
-
-    if isinstance(method, str):
-        methods.append(method)
+    if isinstance(method, muw_correlations):
+        methods.append(method.value)
         multiple = False
     else:
-        methods.extend(method)
+        methods.extend([i.value for i in method])
         multiple = True
 
     muw_dict = {}
@@ -1033,7 +1030,7 @@ def muw(p=None, t=None, s = 0,  method = 'van_wingen'):
         muw_dict['muw_van_wingen'] = muw
 
     if 'russel' in methods:
-        per_s = s / 1e4
+        per_s = salinity / 1e4
         a = -0.04518 + 0.009313*per_s - 0.000393*np.power(per_s,2)
         b = 70.634 + 0.09576*np.power(per_s,2)
         f = 1 + 3.5e-12 * np.power(p,2)* (t-40)
@@ -1042,7 +1039,7 @@ def muw(p=None, t=None, s = 0,  method = 'van_wingen'):
         muw_dict['muw_russel'] = muw
 
     if 'meehan' in methods:
-        per_s = s / 1e4
+        per_s = salinity / 1e4
         d = 1.12166 - 0.0263951*per_s + 6.79461e-4*np.power(per_s,2) + 5.47119e-5*np.power(per_s,3) - 1.55586e-6*np.power(per_s,4)
         muwt = (109.574 - 8.40564*per_s + 0.313314*np.power(per_s,2) + 8.72213e-3*np.power(per_s,3))*np.power(t,-d)
         muw = muwt*(0.9994 + 4.0295e-5*p + 3.1062e-9*np.power(p,2))
@@ -1060,7 +1057,13 @@ class rhow_correlations(str,Enum):
     banzer = 'banzer'
     mccain = 'mccain'
 
-def rhow(p=None,s=0, bw=1, method = 'banzer'):
+@validate_arguments(config=dict(arbitrary_types_allowed=True))
+def rhow(
+    pressure:Pressure=None,
+    salinity:Union[np.ndarray,float,List[float]] = 0, 
+    bw:Union[np.ndarray,float,List[float]] = 1, 
+    method:Union[rhow_correlations,List[rhow_correlations]]=rhow_correlations.banzer
+):
     """
     Estimate Water Density in lb/ft3
 
@@ -1074,38 +1077,31 @@ def rhow(p=None,s=0, bw=1, method = 'banzer'):
 
     Source: Correlaciones Numericas PVT - Carlos Banzer
     """
-    assert isinstance(p, (int, float, list, np.ndarray))
-    p = np.atleast_1d(p)
-
-    assert isinstance(s, (int, float, list, np.ndarray))
-    s = np.atleast_1d(s)
-
-    assert isinstance(bw, (int, float, list, np.ndarray))
+    p = np.atleast_1d(pressure.convert_to('psi').value)
+    salinity = np.atleast_1d(salinity)
     bw = np.atleast_1d(bw)
 
-    assert isinstance(method, (str, list))
-
     methods = []
-
-    if isinstance(method, str):
-        methods.append(method)
+    if isinstance(method, rhow_correlations):
+        methods.append(method.value)
         multiple = False
     else:
-        methods.extend(method)
+        methods.extend([i.value for i in method])
         multiple = True
 
     rhow_dict = {}
 
     if 'banzer' in methods:
-        ge_w = 1 + 0.695e-6*s
+        ge_w = 1 + 0.695e-6*salinity
         rhow = 62.4 * ge_w/bw
         rhow_dict['rhow_banzer'] = rhow
 
     if 'mccain' in methods:
-        if len(s)==1:
-            s_array = np.full(p.shape, s)
-        per_s = s/1e4
+        if len(salinity)==1:
+            s_array = np.full(p.shape, salinity)
+        per_s = salinity/1e4
         rhow = 62.368 + 0.438603*per_s + 1.60074e-3*np.power(per_s,2)
+        rhow_dict['rhow_mccain'] = rhow
 
     rhow_df = pd.DataFrame(rhow_dict, index=p) if multiple == True else pd.DataFrame({'rhow': rhow}, index=p)
     rhow_df.index.name = 'pressure'

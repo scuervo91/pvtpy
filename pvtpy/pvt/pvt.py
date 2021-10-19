@@ -13,9 +13,9 @@ class PVT(BaseModel):
     pressure: Pressure = Field(...)
     fields: Dict[str,List[float]] = Field(...)
       
-    @validator('pressure', pre=True)
+    @validator('pressure')
     def check_array_pressures_order(cls, v):
-        assert isinstance(v.value,list)
+        assert isinstance(v.value,(list,np.array))
         diff = np.diff(np.array(v.value))
         if not any([np.all(diff>0),np.all(diff<0)]):
             raise ValueError('Pressure must be ordered')
