@@ -13,19 +13,19 @@ class PVT(BaseModel):
     pressure: Pressure = Field(...)
     fields: Dict[str,List[float]] = Field(...)
       
-    @validator('pressure')
+    @validator('pressure',pre=True)
     def check_array_pressures_order(cls, v):
-        assert isinstance(v.value,(list,np.array))
+        assert isinstance(v.value,(list,np.ndarray))
         diff = np.diff(np.array(v.value))
         if not any([np.all(diff>0),np.all(diff<0)]):
             raise ValueError('Pressure must be ordered')
         return v
     
-    @validator('fields')
-    def check_length_fields(cls,v,values):
-        for field in v:
-            assert len(v[field]) == len(values['pressure'].value), f'{field} has not the same length than pressure'
-        return v
+    # @validator('fields')
+    # def check_length_fields(cls,v,values):
+    #     for field in v:
+    #         assert len(v[field]) == len(values['pressure'].value), f'{field} has not the same length than pressure'
+    #     return v
     
     class Config:
         extra = 'forbid'

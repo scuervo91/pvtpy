@@ -1115,7 +1115,15 @@ class rhog_correlations(str,Enum):
     ideal_gas = 'ideal_gas'
     real_gas = 'real_gas'
 
-def rhog(p=None, ma=None, z=1, r=10.73, t=None, method='ideal_gas'):
+@validate_arguments(config=dict(arbitrary_types_allowed=True))
+def rhog(
+    pressure:Pressure=None, 
+    ma:Union[np.ndarray,float,List[float]]=None, 
+    z:Union[np.ndarray,float,List[float]]=1, 
+    r:float=10.73, 
+    temperature: Temperature=None, 
+    method:Union[rhog_correlations,List[rhog_correlations]]=rhog_correlations.ideal_gas
+):
     """
     Estimate Gas density 
 
@@ -1133,30 +1141,20 @@ def rhog(p=None, ma=None, z=1, r=10.73, t=None, method='ideal_gas'):
     Source: Reservoir Engineer handbook -  Tarek Ahmed
     """
 
-    assert isinstance(p, (int, float, list, np.ndarray))
-    p = np.atleast_1d(p)
-
-    assert isinstance(t, (int, float, list, np.ndarray))
-    t = np.atleast_1d(t) + 460 # temp to R
-
-    assert isinstance(z, (int, float, list, np.ndarray))
+    p = np.atleast_1d(pressure.convert_to('psi').value)
+    t = np.atleast_1d(temperature.convert_to('rankine').value)# temp to R
     z = np.atleast_1d(z)
-
-    assert isinstance(ma, (int, float, list, np.ndarray))
     ma = np.atleast_1d(ma)
-
-    assert isinstance(r, (int, float))
     r = np.atleast_1d(r)
 
     assert isinstance(method, (str, list))
 
     methods = []
-
-    if isinstance(method, str):
-        methods.append(method)
+    if isinstance(method, rhog_correlations):
+        methods.append(method.value)
         multiple = False
     else:
-        methods.extend(method)
+        methods.extend([i.value for i in method])
         multiple = True
 
     rhog_dict = {}
@@ -1176,7 +1174,13 @@ def rhog(p=None, ma=None, z=1, r=10.73, t=None, method='ideal_gas'):
 class z_correlations(str,Enum):
     papay = 'papay'
 
-def z_factor(p=None, t=None, ppc=None, tpc=None, method='papay'):
+@validate_arguments(config=dict(arbitrary_types_allowed=True))
+def z_factor(
+    pressure:Pressure=None, 
+    temperature:Temperature=None, 
+    critical_properties:CriticalProperties=None,
+    method:Union[z_correlations,List[z_correlations]]=z_correlations.papay
+):
     """
     Estimate Gas compressibility Factor 
 
@@ -1192,27 +1196,18 @@ def z_factor(p=None, t=None, ppc=None, tpc=None, method='papay'):
 
     Source: Reservoir Engineer handbook -  Tarek Ahmed
     """
-    assert isinstance(p, (int, float, list, np.ndarray))
-    p = np.atleast_1d(p)
+    p = np.atleast_1d(pressure.convert_to('psi').value)
+    t = np.atleast_1d(temperature.convert_to('rankine').value) # temp to R
 
-    assert isinstance(t, (int, float, list, np.ndarray))
-    t = np.atleast_1d(t) + 460 # temp to R
-
-    assert isinstance(ppc, (int, float, list, np.ndarray))
-    ppc = np.atleast_1d(ppc) # temp to R
-
-    assert isinstance(tpc, (int, float, list, np.ndarray))
-    tpc = np.atleast_1d(tpc) + 460 # temp to R
-
-    assert isinstance(method, (str, list))
+    ppc = np.atleast_1d(critical_properties.critical_pressure.convert_to('psi').value) # temp to R
+    tpc = np.atleast_1d(critical_properties.critical_temperature.convert_to('rankine').value) # temp to R
 
     methods = []
-
-    if isinstance(method, str):
-        methods.append(method)
+    if isinstance(method, z_correlations):
+        methods.append(method.value)
         multiple = False
     else:
-        methods.extend(method)
+        methods.extend([i.value for i in method])
         multiple = True
 
     z_dict = {}
@@ -1233,7 +1228,13 @@ class bg_units(str,Enum):
     ft3scf = 'ft3scf'
     bblscf = 'bblscf'
 
-def bg(p=None, t=None, z=1, unit='ft3scf'):
+@validate_arguments(config=dict(arbitrary_types_allowed=True))
+def bg(
+    pressure:Pressure=None, 
+    temperature:Temperature=None, 
+    z:Union[np.ndarray,float,List[float]]=1, 
+    unit:Union[bg_units,List[bg_units]]=bg_units.ft3scf
+):
     """
     Estimate Gas Volumetric factor 
 
@@ -1248,24 +1249,17 @@ def bg(p=None, t=None, z=1, unit='ft3scf'):
 
     Source: Reservoir Engineer handbook -  Tarek Ahmed
     """  
-    assert isinstance(p, (int, float, list, np.ndarray))
-    p = np.atleast_1d(p)
-
-    assert isinstance(t, (int, float, list, np.ndarray))
-    t = np.atleast_1d(t) + 460
-
-    assert isinstance(z, (int, float, list, np.ndarray))
+    p = np.atleast_1d(pressure.convert_to('psi').value)
+    t = np.atleast_1d(temperature.convert_to('rankine').value)
     z = np.atleast_1d(z)
 
-    assert isinstance(unit, (str, list))
 
     units = []
-
-    if isinstance(unit, str):
-        units.append(unit)
+    if isinstance(unit, bg_units):
+        units.append(unit.value)
         multiple = False
     else:
-        units.extend(unit)
+        units.extend([i.value for i in unit])
         multiple = True
 
     bg_dict = {}
@@ -1286,7 +1280,13 @@ class eg_units(str,Enum):
     scfft3 = 'scfft3'
     scfbbl = 'scfbbl'
 
-def eg(p=None, t=None, z=1, unit='scfft3'):
+@validate_arguments(config=dict(arbitrary_types_allowed=True))
+def eg(
+    pressure:Pressure=None, 
+    temperature:Temperature=None, 
+    z:Union[np.ndarray,float,List[float]]=1, 
+    unit:Union[eg_units,List[eg_units]]=eg_units.scfft3
+):
     """
     Estimate Gas Volumetric expansion factor
 
@@ -1301,24 +1301,17 @@ def eg(p=None, t=None, z=1, unit='scfft3'):
 
     Source: Reservoir Engineer handbook -  Tarek Ahmed
     """  
-    assert isinstance(p, (int, float, list, np.ndarray))
-    p = np.atleast_1d(p)
-
-    assert isinstance(t, (int, float, list, np.ndarray))
-    t = np.atleast_1d(t) + 460
-
-    assert isinstance(z, (int, float, list, np.ndarray))
+    p = np.atleast_1d(pressure.convert_to('psi').value)
+    t = np.atleast_1d(temperature.convert_to('rankine').value)
     z = np.atleast_1d(z)
 
-    assert isinstance(unit, (str, list))
 
     units = []
-
-    if isinstance(unit, str):
-        units.append(unit)
+    if isinstance(unit, eg_units):
+        units.append(unit.value)
         multiple = False
     else:
-        units.extend(unit)
+        units.extend([i.value for i in unit])
         multiple = True
 
     eg_dict = {}
@@ -1338,7 +1331,16 @@ def eg(p=None, t=None, z=1, unit='scfft3'):
 class cp_correlations(str,Enum):
     standing = 'standing'
     
-def critical_properties(sg=None, gas_type='natural_gas',method='standing'):
+class GasType(str,Enum):
+    natural_gas = 'natural_gas'
+    condensate_gas = 'condensate_gas'
+
+@validate_arguments(config=dict(arbitrary_types_allowed=True)) 
+def critical_properties(
+    sg:Union[np.ndarray,float,List[float]]=None, 
+    gas_type:GasType=GasType.natural_gas,
+    method:cp_correlations=cp_correlations.standing
+):
     """
     Estimate Gas Critial Properties from Specific Gravity of gas. Brown Correlation
 
@@ -1352,21 +1354,13 @@ def critical_properties(sg=None, gas_type='natural_gas',method='standing'):
 
     Source: Reservoir Engineer handbook -  Tarek Ahmed
     """    
-    assert isinstance(sg, (int, float, list, np.ndarray))
     sg = np.atleast_1d(sg)
 
-    assert isinstance(method, (str, list))
-
     methods = []
-
-    if isinstance(method, str):
-        methods.append(method)
-        multiple = False
+    if isinstance(method, cp_correlations):
+        methods.append(method.value)
     else:
-        methods.extend(method)
-        multiple = True
-
-    cp_dict = {}
+        methods.extend([i.value for i in method])
 
     if 'standing' in methods:
         if gas_type == 'natural_gas':
@@ -1376,19 +1370,28 @@ def critical_properties(sg=None, gas_type='natural_gas',method='standing'):
             _ppc = 706.0 + 51.7*sg - 11.1*np.power(sg,2)
             _tpc = 187.0 + 330.0*sg - 71.5*np.power(sg,2)
 
-        if multiple:
-            cp_dict['standing'] = {'ppc':_ppc,'tpc':_tpc}
-        else:
-            cp_dict['ppc'] = _ppc
-            cp_dict['tpc'] = _tpc - 460
+        ppc = Pressure(value=_ppc, unit='psi')
+        tcp = Temperature(value=_tpc, unit='rankine')
+
+        cp = CriticalProperties(
+            critical_pressure=ppc,
+            critical_temperature=tcp
+        )
     
-    return cp_dict 
+    return cp
 
 class cp_correction_correlations(str,Enum):
     wichert_aziz = 'wichert_aziz'
     carr_kobayashi_burrows = 'carr_kobayashi_burrows'
 
-def critical_properties_correction(ppc=None, tpc=None, h2s=0,co2=0, n2=0, method='wichert_aziz'):
+@validate_arguments(config=dict(arbitrary_types_allowed=True)) 
+def critical_properties_correction(
+    critical_properties:CriticalProperties=None,
+    h2s:float=0,
+    co2:float=0, 
+    n2:float=0, 
+    method:cp_correction_correlations=cp_correction_correlations.wichert_aziz
+):
     """
     Correct the critical properties estimations by Non-hydrocarbon components
 
@@ -1405,11 +1408,8 @@ def critical_properties_correction(ppc=None, tpc=None, h2s=0,co2=0, n2=0, method
 
     Source: Reservoir Engineer handbook -  Tarek Ahmed
     """  
-    assert isinstance(ppc, (int, float, list, np.ndarray))
-    ppc = np.atleast_1d(ppc)
-
-    assert isinstance(tpc, (int, float, list, np.ndarray))
-    tpc = np.atleast_1d(tpc)
+    ppc = np.atleast_1d(critical_properties.critical_pressure.convert_to('psi').value)
+    tpc = np.atleast_1d(critical_properties.critical_temperature.convert_to('rankine').value)
 
     if method =='wichert_aziz':
         a = h2s + co2
@@ -1428,7 +1428,7 @@ def critical_properties_correction(ppc=None, tpc=None, h2s=0,co2=0, n2=0, method
     
     cp = CriticalProperties(
         critical_pressure = Pressure(value = ppc_c, unit = 'psi'),
-        critical_temperature = Temperature(value = tpc_c, unit = 'rankine')
+        critical_temperature = Temperature(value = tpc_c, unit = 'rankine').convert_to('farenheit')
     )
 
     return cp
@@ -1436,7 +1436,14 @@ def critical_properties_correction(ppc=None, tpc=None, h2s=0,co2=0, n2=0, method
 class mug_correlations(str,Enum):
     lee_gonzalez = 'lee_gonzalez'
 
-def mug(p=None, t=None, rhog=None, ma=None, method='lee_gonzalez'):
+@validate_arguments(config=dict(arbitrary_types_allowed=True)) 
+def mug(
+    pressure:Pressure=None, 
+    temperature:Temperature=None, 
+    rhog:Union[np.ndarray,float,List[float]]=None, 
+    ma:Union[np.ndarray,float,List[float]]=None, 
+    method:mug_correlations=mug_correlations.lee_gonzalez
+):
     """
     Estimate gas viscosity
 
@@ -1452,19 +1459,10 @@ def mug(p=None, t=None, rhog=None, ma=None, method='lee_gonzalez'):
 
     Source: Reservoir Engineer handbook -  Tarek Ahmed
     """ 
-    assert isinstance(p, (int, float, list, np.ndarray))
-    p = np.atleast_1d(p)
-
-    assert isinstance(t, (int, float, list, np.ndarray))
-    t = np.atleast_1d(t) + 460
-
-    assert isinstance(rhog, (int, float, list, np.ndarray))
+    p = np.atleast_1d(pressure.convert_to('psi').value)
+    t = np.atleast_1d(temperature.convert_to('rankine').value)
     rhog = np.atleast_1d(rhog)
-
-    assert isinstance(ma, (int, float, list, np.ndarray))
     ma = np.atleast_1d(ma)
-
-    assert isinstance(method,str)
 
     if method == 'lee_gonzalez':
         k = ((9.4 + 0.02*ma)*np.power(t,1.5))/(209 + 19*ma + t)
@@ -1478,9 +1476,14 @@ def mug(p=None, t=None, rhog=None, ma=None, method='lee_gonzalez'):
 
 class cg_correlations(str,Enum):
     ideal_gas = 'ideal_gas'
-    real_gas = 'real_gas'
 
-def cg(p=None, z=1, method='ideal_gas'):
+# TODO: Implement cg_correlations real gas
+@validate_arguments(config=dict(arbitrary_types_allowed=True)) 
+def cg(
+    pressure:Pressure=None, 
+    z:Union[np.ndarray,float,List[float]]=1, 
+    method:Union[cg_correlations,List[cg_correlations]]=cg_correlations.ideal_gas
+):
     """
     Estimate gas compressibility
 
@@ -1493,21 +1496,15 @@ def cg(p=None, z=1, method='ideal_gas'):
 
     Source: Reservoir Engineer handbook -  Tarek Ahmed
     """ 
-    assert isinstance(p, (int, float, list, np.ndarray))
-    p = np.atleast_1d(p) 
-
-    assert isinstance(z, (int, float, list, np.ndarray))
+    p = np.atleast_1d(pressure.convert_to('psi').value)
     z = np.atleast_1d(z)  
 
-    assert isinstance(method, (str, list))
-
     methods = []
-
-    if isinstance(method, str):
-        methods.append(method)
+    if isinstance(method, cg_correlations):
+        methods.append(method.value)
         multiple = False
     else:
-        methods.extend(method)
+        methods.extend([i.value for i in method])
         multiple = True
 
     cg_dict = {}

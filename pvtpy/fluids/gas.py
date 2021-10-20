@@ -49,7 +49,8 @@ class Gas(FluidBase):
         normalize = True
     ):
         
-        p_range=np.linspace(start_pressure,end_pressure,n)
+        p_range=Pressure(value=np.linspace(start_pressure,end_pressure,n), unit='psi')
+
         
         # Define Pseudo critical properties
         if self.chromatography is not None:
@@ -69,10 +70,9 @@ class Gas(FluidBase):
         
         # Compressibility factor z
         z_cor = cor.z_factor(
-            p=p_range, 
-            t=self.initial_conditions.temperature.value, 
-            ppc=_cp.critical_pressure.value, 
-            tpc=_cp.critical_temperature.value, 
+            pressure=p_range, 
+            temperature=self.initial_conditions.temperature, 
+            critical_properties=_cp,
             method=correlations.z)
         
         # Density 
@@ -82,24 +82,24 @@ class Gas(FluidBase):
             _ma = self.sg * 28.96
         # Density     
         rhog_cor = cor.rhog(
-            p=p_range, 
+            pressure=p_range, 
             ma=_ma, 
             z=z_cor['z'].values, 
             r=10.73, 
-            t=self.initial_conditions.temperature.value, 
+            temperature=self.initial_conditions.temperature, 
             method=correlations.rhog
         )
         #Gas volumetric factor
         bg_cor = cor.bg(
-            p=p_range,
-            t=self.initial_conditions.temperature.value, 
+            pressure=p_range,
+            temperature=self.initial_conditions.temperature, 
             z=z_cor['z'].values, 
             unit=correlations.bg
         )
         #Gas viscosity
         mug_cor = cor.mug(
-            p=p_range,
-            t=self.initial_conditions.temperature.value, 
+            pressure=p_range,
+            temperature=self.initial_conditions.temperature, 
             rhog=rhog_cor['rhog'].values, 
             ma=_ma, 
             method=correlations.mug
@@ -107,7 +107,7 @@ class Gas(FluidBase):
         
         #Gas compressibility 
         cg_cor = cor.cg(
-            p=p_range, 
+            pressure=p_range, 
             z=z_cor['z'].values, 
             method=correlations.cg
         )
@@ -115,7 +115,7 @@ class Gas(FluidBase):
         _pvt = pd.concat([z_cor,rhog_cor,bg_cor,mug_cor,cg_cor],axis=1)
         
         _pvt = PVT(
-            pressure= Pressure(value = p_range.tolist()),
+            pressure= p_range,
             fields={
                 'z':z_cor['z'].values.tolist(),
                 'rhog':rhog_cor['rhog'].values.tolist(),

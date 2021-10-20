@@ -86,38 +86,59 @@ class Chromatography(BaseModel):
         _ppc = np.dot(df['mole_fraction'].values, df['critical_pressure'].values)
         _tpc = np.dot(df['mole_fraction'].values, df['critical_temperature'].values)
         
+        cp = CriticalProperties(
+            critical_pressure = Pressure(value=_ppc, unit='psi'),
+            critical_temperature = Temperature(value=_tpc, unit='rankine')
+        )
+        
         if correct:
             _co2 = df.loc['carbon-dioxide', 'mole_fraction'] if 'carbon-dioxide' in df.index.tolist() else 0
             _n2 = df.loc['nitrogen', 'mole_fraction'] if 'nitrogen' in df.index.tolist() else 0
             _h2s = df.loc['hydrogen-sulfide', 'mole_fraction'] if 'hydrogen-sulfide' in df.index.tolist() else 0
-            cp = cor.critical_properties_correction(ppc=_ppc, tpc=_tpc, co2=_co2, n2=_n2, h2s=_h2s, method=correct_method)
-        else:
-            cp_dict = {
-                'critical_pressure':Pressure(value = _ppc, unit=pressure_unit),
-                'critical_temperature': Temperature(value=_tpc, unit=temperature_unit)
-            }
-            cp = CriticalProperties(**cp_dict)
+            cp = cor.critical_properties_correction(critical_properties=cp, co2=_co2, n2=_n2, h2s=_h2s, method=correct_method)
+
         return cp
     
-    def get_z(self,pressure=14.7,temperature=60, z_method='papay', cp_correction_method='wichert_aziz', normalize=True):
+    def get_z(
+        self,
+        pressure=Pressure(value=14.7,unit='psi'),
+        temperature=Temperature(value=60, unit='farenheit'), 
+        z_method='papay', 
+        cp_correction_method='wichert_aziz', 
+        normalize=True
+    ):
         cp = self.get_pseudo_critical_properties(correct=True, correct_method=cp_correction_method,normalize=normalize)
+
         return cor.z_factor(
-            p=pressure,
-            t=temperature, 
-            ppc = cp.critical_pressure.value, 
-            tpc = cp.critical_temperature.value, 
+            pressure=pressure,
+            temperature=temperature, 
+            critical_properties=cp,
             method=z_method)
 
-    def get_rhog(self,pressure=14.7,temperature=60, z_method='papay',rhog_method='real_gas',normalize=True):
+    def get_rhog(
+        self,
+        pressure=Pressure(value=14.7,unit='psi'),
+        temperature=Temperature(value=60, unit='farenheit'), 
+        z_method='papay',
+        rhog_method='real_gas',
+        normalize=True
+    ):
         _ma = self.apparent_molecular_weight(normalize=normalize)
         if rhog_method == 'ideal_gas':
-            _rhog = cor.rhog(p=pressure,ma=_ma,t=temperature)
+            _rhog = cor.rhog(pressure=pressure,ma=_ma,temperature=temperature)
         elif rhog_method == 'real_gas':
             _z = self.get_z(pressure=pressure,temperature=temperature,z_method = z_method, normalize=normalize)
-            _rhog = cor.rhog(p=pressure,ma=_ma,z=_z.values.reshape(-1), t=temperature, method=rhog_method)
+            _rhog = cor.rhog(pressure=pressure,ma=_ma,z=_z.values.reshape(-1), temperature=temperature, method=rhog_method)
         return _rhog
     
-    def get_sv(self,pressure=14.7,temperature=60, z_method='papay',rhog_method='real_gas',normalize=True):
+    def get_sv(
+        self,
+        pressure=Pressure(value=14.7,unit='psi'),
+        temperature=Temperature(value=60, unit='farenheit'), 
+        z_method='papay',
+        rhog_method='real_gas',
+        normalize=True
+    ):
         rhog = self.get_rhog(pressure=pressure,temperature=temperature, z_method=z_method,rhog_method=rhog_method,normalize=normalize)
         rhog['sv'] = 1 / rhog['rhog']
         return rhog['sv']
