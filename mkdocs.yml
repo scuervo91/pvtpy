@@ -19,6 +19,10 @@ nav:
   - Home: index.md
   - Tutorial: 
     - PVT Tables: examples/1-pvt/1a-PVT_Tables.ipynb
+    - Correlations:
+      - Oil Correlations: examples/1-pvt/1b_oil_correlations.ipynb
+      - Water Correlations: examples/1-pvt/1c_water_correlations.ipynb
+      - Gas Correlations: examples/1-pvt/1d_gas_correlations.ipynb
     - Fluids:
       - Oil: examples/2-Fluids/2a_Oil.ipynb
       - Gas: examples/2-Fluids/2b_Gas.ipynb
