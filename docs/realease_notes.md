@@ -1,3 +1,9 @@
+## 0.1.2
+
+### Fixes
+* 👷 Fix bug when calculating Oil Pvt from correlations when Bubble pressure is provided
+
+
 ## 0.1.1
 
 ### Fixes
