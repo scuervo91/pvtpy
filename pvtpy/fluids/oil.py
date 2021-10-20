@@ -57,13 +57,13 @@ class Oil(FluidBase):
             rs_cor = cor.rs(
                 pressure = Pressure(value = p_range,unit='psi'),
                 pb = self.pb,
-                temp = self.initial_conditions.temperature,
+                temperature = self.initial_conditions.temperature,
                 sg_gas=self.sg_gas,
                 api=self.api,
                 method = correlations.rs.value
             )
             
-            self.rsb = interp1d(p_range, rs_cor['rs'].values)(self.pb)
+            self.rsb = interp1d(p_range, rs_cor['rs'].values)(self.pb.value)
 
         co_cor = cor.co(
             pressure = Pressure(value = p_range,unit='psi'),
