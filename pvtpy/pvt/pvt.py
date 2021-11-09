@@ -1,6 +1,6 @@
 from pvtpy.black_oil.correlations import critical_properties, critical_properties_correction, z_factor, rhog
 from pydantic import BaseModel, Field, validator
-from typing import List, Optional, Dict
+from typing import List, Optional, Dict, Union
 from enum import Enum
 import pandas as pd 
 import numpy as np
@@ -11,7 +11,7 @@ from ..units import TemperatureUnits, Temperature,PressureUnits,Pressure
     
 class PVT(BaseModel):
     pressure: Pressure = Field(...)
-    fields: Dict[str,List[float]] = Field(...)
+    fields: Dict[str,Union[List[float], np.ndarray]] = Field(...)
       
     @validator('pressure',pre=True)
     def check_array_pressures_order(cls, v):
@@ -30,6 +30,8 @@ class PVT(BaseModel):
     class Config:
         extra = 'forbid'
         validate_assignment = True
+        arbitrary_types_allowed = True
+        json_encoders = {np.ndarray: lambda x: x.tolist()}
         
     def df(self):
         d = self.dict()
