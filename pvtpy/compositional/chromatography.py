@@ -1,6 +1,4 @@
-from logging import critical
-from pvtpy.eos import peng_robinson
-from pydantic import BaseModel, Field, validator, parse_obj_as
+from pydantic import BaseModel, Field, parse_obj_as
 from typing import List, Union
 from enum import Enum
 import numpy as np
@@ -27,8 +25,9 @@ class Chromatography(BaseModel):
     class Config:
         validate_assignment = True
         extra = 'forbid'
-        
-    def from_df(self, df: pd.DataFrame, name:Union[str,List] = None, mole_fraction:Union[str,List] = None):
+    
+    @classmethod
+    def from_df(cls, df: pd.DataFrame, name:Union[str,List] = None, mole_fraction:Union[str,List] = None):
         #Assume names are in the index if name is None
         if name is not None:
             if isinstance(name, str):
@@ -44,8 +43,13 @@ class Chromatography(BaseModel):
                
         _merged = df.merge(properties_df, how='inner',left_index=True,right_index=True).reset_index().rename(columns={'index':'name'})
         
-
-        self.components = parse_obj_as(List[Component], _merged.to_dict(orient='records'))
+        return cls(
+            components = parse_obj_as(
+                List[Component], 
+                _merged.to_dict(orient='records')
+            ) 
+        )
+        
 
     def df(self, pressure_unit='psi',temperature_unit='farenheit',normalize=True, plus_fraction=True, columns=None):
         df = pd.DataFrame()

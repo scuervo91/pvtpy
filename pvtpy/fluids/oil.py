@@ -23,55 +23,61 @@ class Oil(FluidBase):
         #extra = 'forbid'
         validate_assignment = True
     
+    @classmethod
     def pvt_from_correlation(
-        self,
+        cls,
+        api,
+        initial_conditions,
         start_pressure=20,
         end_pressure=5000,
         n=20,
+        pb=None,
+        rsb=None,
+        sg_gas=None,
         correlations = cor.SetOilCorrelations()
     ):
     
         p_range=np.linspace(start_pressure,end_pressure,n)
         
-        if (self.pb is None) & (self.rsb is None):
+        if (pb is None) & (rsb is None):
             raise ValueError('Either Bubble point or Gas Oil Ratio must be defined')
-        elif self.pb is None:
+        elif pb is None:
             pb = cor.pb(
-                rs=self.rsb,
-                temperature=self.initial_conditions.temperature,
-                sg_gas=self.sg_gas,
-                api=self.api,
+                rs=rsb,
+                temperature=initial_conditions.temperature,
+                sg_gas=sg_gas,
+                api=api,
                 method=correlations.pb.value, correction=True)['pb'].values
-            self.pb = Pressure(value=pb, unit='psi')
+            pb = Pressure(value=pb, unit='psi')
             
             rs_cor = cor.rs(
                 pressure = Pressure(value = p_range,unit='psi'),
-                pb = self.pb,
-                temperature = self.initial_conditions.temperature,
-                sg_gas=self.sg_gas,
-                api=self.api,
-                rsb = self.rsb,
+                pb = pb,
+                temperature = initial_conditions.temperature,
+                sg_gas=sg_gas,
+                api=api,
+                rsb = rsb,
                 method = 'valarde'
             )
         else:
             rs_cor = cor.rs(
                 pressure = Pressure(value = p_range,unit='psi'),
-                pb = self.pb,
-                temperature = self.initial_conditions.temperature,
-                sg_gas=self.sg_gas,
-                api=self.api,
+                pb = pb,
+                temperature = initial_conditions.temperature,
+                sg_gas=sg_gas,
+                api=api,
                 method = correlations.rs.value
             )
             
-            self.rsb = interp1d(p_range, rs_cor['rs'].values)(self.pb.value)
+            rsb = interp1d(p_range, rs_cor['rs'].values)(pb.value)
 
         co_cor = cor.co(
             pressure = Pressure(value = p_range,unit='psi'),
             rs = rs_cor['rs'].values,
-            pb = self.pb,
-            temperature = self.initial_conditions.temperature,
-            sg_gas=self.sg_gas,
-            api=self.api,
+            pb = pb,
+            temperature = initial_conditions.temperature,
+            sg_gas=sg_gas,
+            api=api,
             method_above_pb = correlations.co_above.value,
             method_below_pb = correlations.co_below.value             
         )
@@ -79,23 +85,23 @@ class Oil(FluidBase):
         bo_cor = cor.bo(
             pressure = Pressure(value = p_range,unit='psi'),
             rs = rs_cor['rs'].values,
-            pb = self.pb,
-            temperature = self.initial_conditions.temperature,
-            sg_gas=self.sg_gas,
-            api=self.api,
+            pb = pb,
+            temperature = initial_conditions.temperature,
+            sg_gas=sg_gas,
+            api=api,
             co = co_cor['co'].values,
             method = correlations.bo.value
         )
         
-        bob = interp1d(p_range, bo_cor['bo'].values)(self.pb.value)
+        bob = interp1d(p_range, bo_cor['bo'].values)(pb.value)
                 
         muo_cor = cor.muo(
             pressure = Pressure(value = p_range,unit='psi'),
             rs = rs_cor['rs'].values,
-            pb = self.pb,
-            temperature = self.initial_conditions.temperature,
-            api = self.api,
-            rsb = self.rsb,
+            pb = pb,
+            temperature = initial_conditions.temperature,
+            api = api,
+            rsb = rsb,
             method_above_pb = correlations.muo_above.value,
             method_below_pb = correlations.muo_below.value,
             method_dead = correlations.muod.value
@@ -107,9 +113,9 @@ class Oil(FluidBase):
             bo=bo_cor['bo'].values,
             rs=rs_cor['rs'].values,
             bob=bob,
-            api=self.api,
-            pb=self.pb,
-            rsb=self.rsb,
+            api=api,
+            pb=pb,
+            rsb=rsb,
             method = correlations.rho.value
         )
         
@@ -124,9 +130,17 @@ class Oil(FluidBase):
                 'rho':rho_cor['rhoo'].values.tolist()
             }
         )
-        self.pvt = _pvt
+        pvt = _pvt
+        
         #print(_pvt.df())
-        return _pvt
+        return cls(
+            initial_conditions=initial_conditions,
+            pvt = _pvt,
+            api = api,
+            pb = pb,
+            rsb = rsb,
+            sg_gas = sg_gas
+        )
         
     def to_ecl(
         self,
