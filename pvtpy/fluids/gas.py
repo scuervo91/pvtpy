@@ -1,4 +1,3 @@
-from ..compositional import CriticalProperties
 from pydantic import Field 
 import numpy as np
 from enum import Enum
@@ -8,7 +7,7 @@ import pandas as pd
 from .base import FluidBase
 from ..black_oil import correlations as cor
 from ..pvt import PVT
-from ..units import Pressure
+from ..units import Pressure, CriticalProperties
 
 class GasType(str,Enum):
     natural_gas = 'natural_gas'
@@ -29,19 +28,24 @@ class Gas(FluidBase):
                 normalize = normalize
             )
         elif self.sg is not None:
-            _cp_dict = cor.critical_properties(
+            _cp = cor.critical_properties(
                 sg = self.sg, 
                 gas_type = self.gas_type.value, 
                 method = method
             )
-            _cp = CriticalProperties(ppc = _cp_dict['ppc'].item(),tpc = _cp_dict['tpc'].item())
+            #_cp = CriticalProperties(ppc = _cp_dict['ppc'].item(),tpc = _cp_dict['tpc'].item())
         else:
             raise ValueError('Neither chromatography nor sg gas been set')
         
         return _cp
-        
+    
+    @classmethod
     def pvt_from_correlations(
-        self,
+        cls,
+        initial_conditions,
+        chromatography=None,
+        sg=None,
+        gas_type=None,
         start_pressure=20,
         end_pressure=5000,
         n=20, 
@@ -53,16 +57,16 @@ class Gas(FluidBase):
 
         
         # Define Pseudo critical properties
-        if self.chromatography is not None:
-            _cp = self.chromatography.get_pseudo_critical_properties(
+        if chromatography is not None:
+            _cp = chromatography.get_pseudo_critical_properties(
                 correct = correlations.correct_critical_properties,
                 correct_method = correlations.critical_properties_correction,
                 normalize = normalize
             )
-        elif self.sg is not None:
+        elif sg is not None:
             _cp = cor.critical_properties(
-                sg = self.sg, 
-                gas_type = self.gas_type.value, 
+                sg = sg, 
+                gas_type = gas_type.value, 
                 method = correlations.critical_properties
             )
         else:
@@ -71,35 +75,35 @@ class Gas(FluidBase):
         # Compressibility factor z
         z_cor = cor.z_factor(
             pressure=p_range, 
-            temperature=self.initial_conditions.temperature, 
+            temperature=initial_conditions.temperature, 
             critical_properties=_cp,
             method=correlations.z)
         
         # Density 
-        if self.chromatography is not None:
-            _ma = self.chromatography.apparent_molecular_weight(normalize=normalize)
+        if chromatography is not None:
+            _ma = chromatography.apparent_molecular_weight(normalize=normalize)
         else:
-            _ma = self.sg * 28.96
+            _ma = sg * 28.96
         # Density     
         rhog_cor = cor.rhog(
             pressure=p_range, 
             ma=_ma, 
             z=z_cor['z'].values, 
             r=10.73, 
-            temperature=self.initial_conditions.temperature, 
+            temperature=initial_conditions.temperature, 
             method=correlations.rhog
         )
         #Gas volumetric factor
         bg_cor = cor.bg(
             pressure=p_range,
-            temperature=self.initial_conditions.temperature, 
+            temperature=initial_conditions.temperature, 
             z=z_cor['z'].values, 
             unit=correlations.bg
         )
         #Gas viscosity
         mug_cor = cor.mug(
             pressure=p_range,
-            temperature=self.initial_conditions.temperature, 
+            temperature=initial_conditions.temperature, 
             rhog=rhog_cor['rhog'].values, 
             ma=_ma, 
             method=correlations.mug
@@ -124,9 +128,15 @@ class Gas(FluidBase):
                 'cg':cg_cor['cg'].values.tolist()
             }
         )
-        self.pvt = _pvt
+        pvt = _pvt
         #print(_pvt.df())
-        return _pvt
+        return cls(
+            initial_conditions=initial_conditions,
+            chromatography=None,
+            pvt = _pvt,
+            sg=sg,
+            gas_type=gas_type
+        )
     
     def to_ecl(
         self,
@@ -150,10 +160,10 @@ class Gas(FluidBase):
         
         if pressure is None:
             if min_pressure is None:
-                min_pressure = np.min(self.pvt.pressure)
+                min_pressure = np.min(self.pvt.pressure.value)
             
             if max_pressure is None:
-                max_pressure = np.max(self.pvt.pressure)
+                max_pressure = np.max(self.pvt.pressure.value)
                 
             pressure = np.linspace(min_pressure,max_pressure,n)
             

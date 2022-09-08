@@ -14,9 +14,13 @@ class Water(FluidBase):
     class Config:
         extra = 'ignore'
         validate_assignment = True
-        
+    
+    @classmethod
     def pvt_from_correlation(
-        self,
+        cls,
+        initial_conditions,
+        salinity,
+        pb,
         start_pressure=20,
         end_pressure=5000,
         n=20,
@@ -28,35 +32,35 @@ class Water(FluidBase):
 
         rsw_cor = cor.rsw(
             pressure=p_range, 
-            temperature=self.initial_conditions.temperature, 
-            salinity=self.salinity, 
+            temperature=initial_conditions.temperature, 
+            salinity=salinity, 
             method=correlations.rsw
         )
         cw_cor = cor.cw(
             pressure=p_range, 
-            temperature=self.initial_conditions.temperature, 
+            temperature=initial_conditions.temperature, 
             rsw=rsw_cor['rsw'].values, 
-            salinity=self.salinity, 
+            salinity=salinity, 
             method=correlations.cw
         )
         bw_cor = cor.bw(
             pressure=p_range, 
-            temperature=self.initial_conditions.temperature, 
-            pb=self.pb, 
+            temperature=initial_conditions.temperature, 
+            pb=pb, 
             cw=cw_cor['cw'].values, 
-            salinity=self.salinity, 
+            salinity=salinity, 
             method=correlations.bw
         )
         rhow_cor = cor.rhow(
             pressure=p_range,
-            salinity=self.salinity, 
+            salinity=salinity, 
             bw=bw_cor['bw'].values, 
             method = correlations.rhow
             )
         muw_cor = cor.muw(
             pressure=p_range, 
-            temperature=self.initial_conditions.temperature, 
-            salinity = self.salinity,  
+            temperature=initial_conditions.temperature, 
+            salinity = salinity,  
             method = correlations.muw
         )
 
@@ -72,9 +76,11 @@ class Water(FluidBase):
             }
         )
 
-        self.pvt = _pvt
-        #print(_pvt.df())
-        return _pvt
+        return cls(
+            initial_conditions=initial_conditions,
+            pvt=_pvt,
+            salinity=salinity
+        )
     
     def to_ecl(
         self,
