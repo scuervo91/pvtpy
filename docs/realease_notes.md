@@ -1,6 +1,10 @@
 
 # Releases Notes
 
+## 0.1.4
+### Fixes
+* dependencies issues
+
 ## 0.1.3
 ### Fixes
 * Add Class methods to main classes.
